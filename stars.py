@@ -40,7 +40,6 @@ class Stars(object):
 	# Game logic
 	#
 	def tick(self, pressed):
-
 		# Update all objects in the scene
 		#
 		for obj in self.scene:
@@ -48,6 +47,9 @@ class Stars(object):
 
 		# Process results of update
 		#
+		if self.ship.dead:
+			#HACKY HACKY RESET
+			self.reset()
 
 
 
@@ -85,45 +87,61 @@ class Ship(object):
 	"""docstring for Ship"""
 	def __init__(self):
 		super(Ship, self).__init__()
-		self.pos = vec3([0, 0, 0])
+		self.position = vec3([0, 0, 0])
 		self.speed = 0.1
+		self.dead = False
 
 	def get_view_matrix(self):
-		cam_pos = vec3([0, 0, self.pos.z + 10])
+		cam_pos = vec3([0, 0, self.position.z + 10])
 		return mat4.translate(cam_pos[0], cam_pos[1], cam_pos[2])
 
 		
 	def update(self, scene, pressed):
 
-		# Update position
-		#
-		dx = 0
-		dy = 0
+		if not self.dead:
+			# Update position
+			#
+			dx = 0
+			dy = 0
 
-		if pressed[K_LEFT]:		dx -= 1.0
-		if pressed[K_RIGHT]:	dx += 1.0
-		if pressed[K_UP]:		dy += 1.0
-		if pressed[K_DOWN]:		dy -= 1.0
+			if pressed[K_LEFT]:		dx -= 1.0
+			if pressed[K_RIGHT]:	dx += 1.0
+			if pressed[K_UP]:		dy += 1.0
+			if pressed[K_DOWN]:		dy -= 1.0
 
-		move = vec3([dx, dy, 0])
+			move = vec3([dx, dy, 0])
 
-		if move.mag() != 0:
-			self.pos = self.pos + (move.unit() * 0.3) # TODO paramaterize speed
+			if move.mag() != 0:
+				self.position = self.position + (move.unit() * 0.2) # TODO paramaterize speed
 
-		# Move foward
-		#
-		self.pos = self.pos + vec3([0, 0, -self.speed])
-		self.speed *= 1.001
+			# Move foward
+			#
+			self.position = self.position + vec3([0, 0, -self.speed])
+			self.speed *= 1.001
 
-		# Update target
-		# TODO
+			# Update target
+			#
+
+			# Colision detection
+			#
+			my_s = sphere(self.position, 1) # my sphere
+			ss = [obj.get_sphere() for obj in scene if isinstance(obj, Astroid)]
+			for s in ss:
+				if my_s.sphere_intersection(s) < 0 :
+					self.dead = True
+					break;
+				# } 
+			# }
+		# }
+
+
 
 
 	def draw(self, gl, proj, view):
 		if not cube_init:
 			initCube(gl)
 
-		model = mat4.translate(self.pos.x, self.pos.y, self.pos.z)
+		model = mat4.translate(self.position.x, self.position.y, self.position.z)
 		mv = view * model
 
 		# Render
