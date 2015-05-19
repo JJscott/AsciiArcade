@@ -24,7 +24,7 @@ import stars
 
 
 
-gl = pygloo.init()
+gl = None
 game = stars.Stars()
 
 
@@ -58,7 +58,10 @@ def run():
 	pygame.init()
 	clock = pygame.time.Clock()
 	screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
-
+	
+	global gl
+	gl = pygloo.init()
+	
 	# Enter game loop
 	#
 	while True:
