@@ -31,15 +31,16 @@ game = stars.Stars()
 
 def render_normal(w, h):
 
+	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	
 	# Clear the screen, and z-buffer
-	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 	gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 	gl.glEnable(GL_DEPTH_TEST);
 	gl.glDepthFunc(GL_LESS);
 	gl.glViewport(0, 0, w, h);
 
 	# Forward rendering
-	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	game.render(gl, w, h)
 
 	gl.glFinish();
