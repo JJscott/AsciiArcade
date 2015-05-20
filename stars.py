@@ -69,7 +69,10 @@ class Stars(object):
 		# 
 		for obj in self.scene:
 			obj.draw(gl, proj, view)
-
+		
+		# ascii needs proj matrix
+		return proj
+		
 	# TODO in Future
 	#
 	def render_GUI():

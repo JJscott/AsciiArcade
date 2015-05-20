@@ -21,32 +21,36 @@ import math
 # The actual game
 #
 import stars
+import ascii
 
+asciirenderer = None
 
 
 gl = None
 game = stars.Stars()
 
-
-def render(w, h):
+def render_normal(w, h):
 
 	# Clear the screen, and z-buffer
-	# 
 	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-	gl.glClearColor(1.0, 1.0, 1.0, 0.0)
+	gl.glClearColor(1.0, 1.0, 1.0, 1.0)
 	gl.glEnable(GL_DEPTH_TEST);
 	gl.glDepthFunc(GL_LESS);
 	gl.glViewport(0, 0, w, h);
 
 	# Forward rendering
-	# 
 	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
 	game.render(gl, w, h)
 
 	gl.glFinish();
 
 # }
+
+def render_ascii(w, h):
+	asciirenderer.render(w, h, game)
+# }
+
+render = render_normal
 
 
 def run():
@@ -62,6 +66,9 @@ def run():
 	global gl
 	gl = pygloo.init()
 	
+	global asciirenderer
+	asciirenderer = ascii.AsciiRenderer(gl)
+	
 	# Enter game loop
 	#
 	while True:
@@ -74,6 +81,12 @@ def run():
 			if event.type == VIDEORESIZE:
 				width, height = event.size
 				screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
+			if event.type == KEYDOWN:
+				if event.key == K_BACKSPACE:
+					global render
+					render = { render_normal : render_ascii, render_ascii : render_normal }[render]
+				# }
+			# }
 		# }
 
 		# Update the clock
