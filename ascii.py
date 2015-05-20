@@ -4,7 +4,125 @@ from __future__ import division
 import pygame
 import ctypes
 from pygloo import *
-import simpleShader
+from simpleShader import makeProgram
+
+_shader_fullscreen_source = '''
+
+// vertex shader
+#ifdef _VERTEX_
+
+void main() { }
+
+#endif
+
+// geometry shader
+#ifdef _GEOMETRY_
+
+layout(points) in;
+layout(triangle_strip, max_vertices = 3) out;
+
+out vec2 texCoord;
+
+void main() {
+	// output a single triangle that covers the whole screen
+	
+	gl_Position = vec4(3.0, 1.0, 0.0, 1.0);
+	texCoord = vec2(2.0, 1.0);
+	EmitVertex();
+	
+	gl_Position = vec4(-1.0, 1.0, 0.0, 1.0);
+	texCoord = vec2(0.0, 1.0);
+	EmitVertex();
+	
+	gl_Position = vec4(-1.0, -3.0, 0.0, 1.0);
+	texCoord = vec2(0.0, -1.0);
+	EmitVertex();
+	
+	EndPrimitive();
+	
+}
+
+#endif
+
+// fragment shader
+#ifdef _FRAGMENT_
+
+in vec2 texCoord;
+
+// main() should be implemented by includer
+
+#endif
+'''
+
+_shader_ascii_source = _shader_fullscreen_source + '''
+
+uniform ivec2 char_size;
+uniform sampler2D sampler_color;
+uniform sampler2D sampler_depth;
+
+#ifdef _FRAGMENT_
+
+out vec4 frag_ascii;
+
+void main() {
+	frag_ascii = vec4(texture(sampler_color, texCoord).rgb, 75.5 / 255.0);
+}
+
+#endif
+'''
+
+_shader_text_source = '''
+
+uniform sampler2D sampler_text;
+uniform sampler2D sampler_font;
+
+const vec3 bgcolor = vec3(1.0);
+
+#ifdef _VERTEX_
+
+layout(location = 0) in vec2 pos;
+
+out vec2 texCoord;
+flat out vec3 color;
+flat out int codepoint;
+
+void main() {
+	gl_Position = vec4(pos, 0.0, 1.0);
+	texCoord = vec2(0.5) + 0.5 * pos;
+	vec4 rgba = texture(sampler_text, texCoord);
+	color = rgba.rgb;
+	codepoint = int(floor(rgba.a * 255.0));
+}
+
+
+#endif
+
+#ifdef _FRAGMENT_
+
+in vec2 texCoord;
+flat in vec3 color;
+flat in int codepoint;
+
+out vec4 frag_color;
+
+vec4 textureFont(int c) {
+	// TODO discontinuities screw up gradients for this => line artefacts from excessive lod-ing
+	vec2 uv = mod(vec2(1.0, -1.0) * texCoord * vec2(textureSize(sampler_text, 0)), vec2(1.0));
+	uv.x *= 0.75;
+	int ix = c & 0xF;
+	int iy = c >> 4;
+	return texture(sampler_font, (vec2(ix, iy) + uv) / 16.0);
+}
+
+void main() {
+	frag_color = vec4(mix(bgcolor, color, vec3(textureFont(codepoint).r)), 1.0);
+}
+
+#endif
+
+'''
+
+
 
 class AsciiRenderer:
 	
@@ -14,7 +132,7 @@ class AsciiRenderer:
 		self._img_size = (1, 1)
 		
 		# text screen buffer (w, h)
-		self._text_size = (0, 100)
+		self._text_size = (0, 70)
 		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
@@ -24,15 +142,16 @@ class AsciiRenderer:
 		# font texture
 		self._tex_font = GLuint(0)
 		
-		# this feels disgusting
-		buf = ctypes.create_string_buffer(pygame.image.tostring(pygame.image.load('./res/font.png'), 'RGB'))
+		fontimg = pygame.image.load('./res/font.png')
 		
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_font)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, buf)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 6) # TODO dont hardcode this
+		# this feels disgusting
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, fontimg.get_width(), fontimg.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, ctypes.create_string_buffer(pygame.image.tostring(fontimg, 'RGB')))
 		gl.glGenerateMipmap(GL_TEXTURE_2D)
 		
 		# main FBO
@@ -48,19 +167,19 @@ class AsciiRenderer:
 		
 		# color texture
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 1, 1, 0, GL_RGB, GL_FLOAT, None)
 		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_color, 0)
 		
 		# depth texture
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 1, 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
 		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self._tex_depth, 0)
 		
@@ -75,34 +194,34 @@ class AsciiRenderer:
 		
 		gl.glGenTextures(1, self._tex_edge)
 		
-		# edge texture
+		# edge texture - RGB-EDGE
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_FLOAT, None)
 		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_edge, 0)
 		
 		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
 		
-		# ascii FBO
-		self._fbo_ascii = GLuint(0)
-		self._tex_ascii = GLuint(0) # RGB-ASCII
+		# text FBO
+		self._fbo_text = GLuint(0)
+		self._tex_text = GLuint(0) # RGB-ASCII
 		
-		gl.glGenFramebuffers(1, self._fbo_ascii)
-		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_ascii)
+		gl.glGenFramebuffers(1, self._fbo_text)
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_text)
 		
-		gl.glGenTextures(1, self._tex_ascii)
+		gl.glGenTextures(1, self._tex_text)
 		
 		# RGB-ASCII texture
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_ascii)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_text)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_FLOAT, None)
-		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_ascii, 0)
+		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_text, 0)
 		
 		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
 		
@@ -122,7 +241,7 @@ class AsciiRenderer:
 		
 		gl = self.gl
 		
-		self._text_size = (int(self._text_size[1] * w / h), self._text_size[1])
+		self._text_size = (int(self._text_size[1] * w / h * self._char_size[1] / self._char_size[0]), self._text_size[1])
 		self._img_size = tuple(a * b for a, b in zip(self._text_size, self._char_size))
 		
 		gl.glActiveTexture(GL_TEXTURE0)
@@ -140,30 +259,162 @@ class AsciiRenderer:
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, self._img_size[0], self._img_size[1], 0, GL_RGBA, GL_FLOAT, None)
 		
 		# RGB-ASCII texture
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_ascii)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_text)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, self._text_size[0], self._text_size[1], 0, GL_RGBA, GL_FLOAT, None)
 		
 	# }
 	
-	def render(self, w, h, game):
+	def _draw_dummy(self, instances = 1, _vao = GLuint(0)):
+		gl = self.gl
+		if not _vao.value:
+			gl.glGenVertexArrays(1, _vao)
+		# }
+		gl.glBindVertexArray(_vao);
+		gl.glDrawArraysInstanced(GL_POINTS, 0, 1, instances);
+		gl.glBindVertexArray(0);
+	# }
+	
+	def _draw_ascii_grid(self, w, h, _cache = {}):
+		# w, h are quads
+		gl = self.gl
+		vao = _cache.get((w, h), None)
+		if not vao:
+			vao = GLuint(0)
+			gl.glGenVertexArrays(1, vao)
+			
+			ibo = GLuint(0)
+			vbo_pos = GLuint(0)
+			
+			gl.glGenBuffers(1, ibo)
+			gl.glGenBuffers(1, vbo_pos)
+			
+			idx = []
+			pos = []
+			
+			for y in xrange(h + 1):
+				for x in xrange(w + 1):
+					pos.append(2 * x / w - 1)
+					pos.append(2 * y / h - 1)
+					# only 2D!
+				# }
+			# }
+			
+			def get_index(x, y):
+				if x < 0 or x > w: return 0
+				if y < 0 or y > h: return 0
+				return (w + 1) * y + x
+			# }
+			
+			for y in xrange(h):
+				for x in xrange(w):
+					# 3---2 //
+					# | /   //
+					# 1     //
+					idx.append(get_index(x, y))
+					idx.append(get_index(x + 1, y + 1))
+					idx.append(get_index(x, y + 1))
+					#     3 //
+					#   / | //
+					# 1---2 //
+					idx.append(get_index(x, y))
+					idx.append(get_index(x + 1, y))
+					idx.append(get_index(x + 1, y + 1))
+				# }
+			# }
+			
+			gl.glBindVertexArray(vao)
+			
+			# upload indices
+			gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)
+			gl.glBufferData(GL_ELEMENT_ARRAY_BUFFER, len(idx) * ctypes.sizeof(GLuint), c_array(GLuint, idx), GL_STATIC_DRAW)
+			
+			# upload positions
+			gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_pos)
+			gl.glBufferData(GL_ARRAY_BUFFER, len(pos) * ctypes.sizeof(GLfloat), c_array(GLfloat, pos), GL_STATIC_DRAW)
+			gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, None)
+			gl.glEnableVertexAttribArray(0)
+			
+			_cache[(w, h)] = vao
+		# }
+		
+		gl.glBindVertexArray(vao)
+		gl.glProvokingVertex(GL_FIRST_VERTEX_CONVENTION)
+		gl.glDrawElements(GL_TRIANGLES, 6 * w * h, GL_UNSIGNED_INT, None)
+		gl.glBindVertexArray(0)
+	# }
+	
+	def render(self, w, h, game, _cache = {}):
 		gl = self.gl
 		
 		if (w, h) == (0, 0): return
 		
 		self._resize(w, h)
 		
-		
-		# proper display
-		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		# render game to color + depth framebuffer
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_main)
 		gl.glClearColor(1.0, 1.0, 1.0, 1.0)
 		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-		gl.glEnable(GL_DEPTH_TEST);
-		gl.glDepthFunc(GL_LESS);
-		gl.glViewport(0, 0, w, h);
+		gl.glEnable(GL_DEPTH_TEST)
+		gl.glDepthFunc(GL_LESS)
+		gl.glViewport(0, 0, *self._img_size)
 		
+		game.render(gl, *self._img_size)
 		
+		gl.glDisable(GL_DEPTH_TEST)
 		
+		# TODO do edge detection
+		# output texture is (original) color + edginess
 		
+		# ASCII conversion
+		# output texture is (new) color + ascii code
+		
+		prog_ascii = _cache.get('prog_ascii', None)
+		if not prog_ascii: 
+			prog_ascii = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER), _shader_ascii_source)
+			_cache['prog_ascii'] = prog_ascii
+		# }
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color) # TODO edge
+		gl.glActiveTexture(GL_TEXTURE1)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
+		
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_text)
+		gl.glViewport(0, 0, *self._text_size)
+		
+		gl.glUseProgram(prog_ascii)
+		gl.glUniform2i(gl.glGetUniformLocation(prog_ascii, 'char_size'), *self._char_size)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_color'), 0)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_depth'), 1)
+		
+		self._draw_dummy()
+		
+		# TODO render strings into ascii texture (glTexSubImage2D?)
+		
+		# real output: convert ASCII codes to text via font atlas
+		
+		prog_text = _cache.get('prog_text', None)
+		if not prog_text:
+			prog_text = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_FRAGMENT_SHADER), _shader_text_source)
+			_cache['prog_text'] = prog_text
+		# }
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_text)
+		gl.glActiveTexture(GL_TEXTURE1)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_font)
+		
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
+		gl.glViewport(0, 0, w, h)
+		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+		
+		gl.glUseProgram(prog_text)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_text'), 0)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_font'), 1)
+		
+		self._draw_ascii_grid(*self._text_size)
+		
+		gl.glUseProgram(0)
 	# }
 	
 	def draw_text(self, row, col, text, color = (0.0, 0.0, 0.0)):
@@ -171,6 +422,20 @@ class AsciiRenderer:
 	# }
 	
 # }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
