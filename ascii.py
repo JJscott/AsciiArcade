@@ -54,6 +54,17 @@ in vec2 texCoord;
 #endif
 '''
 
+_shader_edge_source = _shader_fullscreen_source + '''
+
+#ifdef _FRAGMENT_
+
+void main() {
+	
+}
+
+#endif
+'''
+
 _shader_ascii_source = _shader_fullscreen_source + '''
 
 uniform ivec2 char_size;
@@ -91,19 +102,21 @@ uniform sampler2D sampler_font;
 
 const vec3 bgcolor = vec3(1.0);
 
+const vec2 char_uvlim = vec2(0.75, 1.0) / 16.0;
+
 #ifdef _VERTEX_
 
 layout(location = 0) in vec2 pos;
 
 out vec2 texCoord;
-flat out vec3 color;
+flat out vec3 textcolor;
 flat out int codepoint;
 
 void main() {
 	gl_Position = vec4(pos, 0.0, 1.0);
 	texCoord = vec2(0.5) + 0.5 * pos;
 	vec4 rgba = texelFetch(sampler_text, ivec2(floor(texCoord * vec2(textureSize(sampler_text, 0)))), 0);
-	color = rgba.rgb;
+	textcolor = rgba.rgb;
 	codepoint = int(floor(rgba.a * 255.0));
 }
 
@@ -113,22 +126,23 @@ void main() {
 #ifdef _FRAGMENT_
 
 in vec2 texCoord;
-flat in vec3 color;
+flat in vec3 textcolor;
 flat in int codepoint;
 
 out vec4 frag_color;
 
 vec4 textureFont(int c, vec2 uv) {
-	uv.x *= 0.75;
+	vec2 uvmod = mod(vec2(1.0, -1.0) * uv, vec2(1.0));
 	int ix = c & 0xF;
 	int iy = c >> 4;
-	return texture(sampler_font, (vec2(ix, iy) + uv) / 16.0);
+	// manual grad to avoid discontinuities from mod()
+	// TODO fix inter-char interpolation
+	return textureGrad(sampler_font, vec2(ix, iy) / 16.0 + uvmod * char_uvlim, dFdx(uv * char_uvlim), dFdy(uv * char_uvlim));
 }
 
 void main() {
-	// TODO discontinuities screw up gradients for this => line artefacts from excessive lod-ing
-	vec2 fontuv = mod(vec2(1.0, -1.0) * texCoord * vec2(textureSize(sampler_text, 0)), vec2(1.0));
-	frag_color = vec4(mix(bgcolor, color, vec3(textureFont(codepoint, fontuv).r)), 1.0);
+	vec2 fontuv = texCoord * vec2(textureSize(sampler_text, 0));
+	frag_color = vec4(mix(bgcolor, textcolor, vec3(textureFont(codepoint, fontuv).r)), 1.0);
 }
 
 #endif
@@ -145,7 +159,7 @@ class AsciiRenderer:
 		self._img_size = (1, 1)
 		
 		# text screen buffer (w, h)
-		self._text_size = (0, 70)
+		self._text_size = (0, 50)
 		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
@@ -168,7 +182,7 @@ class AsciiRenderer:
 		gl.glGenerateMipmap(GL_TEXTURE_2D)
 		
 		# luminance to ASCII texture (1D)
-		lumstr = '#MNXI*:\'. '
+		lumstr = '#BXOI*eoc:. '
 		self._tex_lum2ascii = GLuint(0)
 		gl.glGenTextures(1, self._tex_lum2ascii)
 		
