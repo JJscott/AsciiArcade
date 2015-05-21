@@ -11,7 +11,11 @@ _shader_fullscreen_source = '''
 // vertex shader
 #ifdef _VERTEX_
 
-void main() { }
+flat out int instanceID;
+
+void main() {
+	instanceID = gl_InstanceID;
+}
 
 #endif
 
@@ -21,21 +25,31 @@ void main() { }
 layout(points) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-out vec2 texCoord;
+flat in int instanceID[];
+
+out vec2 fullscreen_tex_coord;
+flat out int fullscreen_layer;
 
 void main() {
 	// output a single triangle that covers the whole screen
+	// if instanced, set layer to instance id
 	
 	gl_Position = vec4(3.0, 1.0, 0.0, 1.0);
-	texCoord = vec2(2.0, 1.0);
+	gl_Layer = instanceID[0];
+	fullscreen_layer = instanceID[0];
+	fullscreen_tex_coord = vec2(2.0, 1.0);
 	EmitVertex();
 	
 	gl_Position = vec4(-1.0, 1.0, 0.0, 1.0);
-	texCoord = vec2(0.0, 1.0);
+	gl_Layer = instanceID[0];
+	fullscreen_layer = instanceID[0];
+	fullscreen_tex_coord = vec2(0.0, 1.0);
 	EmitVertex();
 	
 	gl_Position = vec4(-1.0, -3.0, 0.0, 1.0);
-	texCoord = vec2(0.0, -1.0);
+	gl_Layer = instanceID[0];
+	fullscreen_layer = instanceID[0];
+	fullscreen_tex_coord = vec2(0.0, -1.0);
 	EmitVertex();
 	
 	EndPrimitive();
@@ -47,9 +61,29 @@ void main() {
 // fragment shader
 #ifdef _FRAGMENT_
 
-in vec2 texCoord;
+in vec2 fullscreen_tex_coord;
+flat in int fullscreen_layer;
 
 // main() should be implemented by includer
+
+#endif
+'''
+
+_shader_font_source = _shader_fullscreen_source + '''
+
+uniform sampler2D sampler_fontatlas;
+
+#ifdef _FRAGMENT_
+
+out vec4 frag_color;
+
+void main() {
+	vec2 uv = mod(vec2(1.0, -1.0) * fullscreen_tex_coord, vec2(1.0));
+	int codepoint = fullscreen_layer;
+	int ix = codepoint & 0xF;
+	int iy = codepoint >> 4;
+	frag_color = texture(sampler_fontatlas, (vec2(ix, iy) + uv) / 16.0);
+}
 
 #endif
 '''
@@ -98,51 +132,47 @@ void main() {
 _shader_text_source = '''
 
 uniform sampler2D sampler_text;
-uniform sampler2D sampler_font;
+uniform sampler2DArray sampler_font;
 
 const vec3 bgcolor = vec3(1.0);
 
-const vec2 char_uvlim = vec2(0.75, 1.0) / 16.0;
+const vec2 char_uvlim = vec2(0.75, 1.0);
 
 #ifdef _VERTEX_
 
 layout(location = 0) in vec2 pos;
 
-out vec2 texCoord;
+out vec2 fullscreen_tex_coord;
 flat out vec3 textcolor;
 flat out int codepoint;
 
 void main() {
 	gl_Position = vec4(pos, 0.0, 1.0);
-	texCoord = vec2(0.5) + 0.5 * pos;
-	vec4 rgba = texelFetch(sampler_text, ivec2(floor(texCoord * vec2(textureSize(sampler_text, 0)))), 0);
+	fullscreen_tex_coord = vec2(0.5) + 0.5 * pos;
+	vec4 rgba = texelFetch(sampler_text, ivec2(floor(fullscreen_tex_coord * vec2(textureSize(sampler_text, 0)))), 0);
 	textcolor = rgba.rgb;
 	codepoint = int(floor(rgba.a * 255.0));
 }
-
 
 #endif
 
 #ifdef _FRAGMENT_
 
-in vec2 texCoord;
+in vec2 fullscreen_tex_coord;
 flat in vec3 textcolor;
 flat in int codepoint;
 
 out vec4 frag_color;
 
 vec4 textureFont(int c, vec2 uv) {
-	vec2 uvmod = mod(vec2(1.0, -1.0) * uv, vec2(1.0));
-	int ix = c & 0xF;
-	int iy = c >> 4;
 	// manual grad to avoid discontinuities from mod()
-	// TODO fix inter-char interpolation
-	return textureGrad(sampler_font, vec2(ix, iy) / 16.0 + uvmod * char_uvlim, dFdx(uv * char_uvlim), dFdy(uv * char_uvlim));
+	// can't use repeat wrap mode instead of mod because we have to reduce uv to fit char bounding box
+	return textureGrad(sampler_font, vec3(mod(uv, vec2(1.0)) * char_uvlim, codepoint), dFdx(uv * char_uvlim), dFdy(uv * char_uvlim));
 }
 
 void main() {
-	vec2 fontuv = texCoord * vec2(textureSize(sampler_text, 0));
-	frag_color = vec4(mix(bgcolor, textcolor, vec3(textureFont(codepoint, fontuv).r)), 1.0);
+	float f = textureFont(codepoint, fullscreen_tex_coord * vec2(textureSize(sampler_text, 0))).r;
+	frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
 }
 
 #endif
@@ -159,30 +189,18 @@ class AsciiRenderer:
 		self._img_size = (1, 1)
 		
 		# text screen buffer (w, h)
-		self._text_size = (0, 50)
+		self._text_size = (0, 80)
 		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
 		
+		# font texture
+		self._init_font()
+		
 		gl.glActiveTexture(GL_TEXTURE0)
 		
-		# font texture
-		fontimg = pygame.image.load('./res/font.png')
-		self._tex_font = GLuint(0)
-		gl.glGenTextures(1, self._tex_font)
-		
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_font)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 6) # TODO dont hardcode this
-		# this feels disgusting
-		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, fontimg.get_width(), fontimg.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, ctypes.create_string_buffer(pygame.image.tostring(fontimg, 'RGB')))
-		gl.glGenerateMipmap(GL_TEXTURE_2D)
-		
 		# luminance to ASCII texture (1D)
-		lumstr = '#BXOI*eoc:. '
+		lumstr = '#BXEOCxeoc::..  '
 		self._tex_lum2ascii = GLuint(0)
 		gl.glGenTextures(1, self._tex_lum2ascii)
 		
@@ -271,6 +289,63 @@ class AsciiRenderer:
 		# pending direct text
 		# (row, col, color, text)
 		self._direct_text = []
+	# }
+	
+	def _init_font(self):
+		gl = self.gl
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		
+		# setup fbo to draw font into array texture
+		fbo = GLuint(0)
+		tex_font = GLuint(0)
+		
+		gl.glGenFramebuffers(1, fbo)
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo)
+		
+		gl.glGenTextures(1, tex_font)
+		
+		gl.glBindTexture(GL_TEXTURE_2D_ARRAY, tex_font)
+		gl.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		gl.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+		gl.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+		gl.glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8, 64, 64, 256, 0, GL_RED, GL_FLOAT, None)
+		gl.glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_font, 0)
+		
+		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
+		
+		# load font atlas
+		fontimg = pygame.image.load('./res/font.png')
+		tex_font_atlas = GLuint(0)
+		gl.glGenTextures(1, tex_font_atlas)
+		
+		gl.glBindTexture(GL_TEXTURE_2D, tex_font_atlas)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST) # we won't be downscaling
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+		# this feels disgusting
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, fontimg.get_width(), fontimg.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, ctypes.create_string_buffer(pygame.image.tostring(fontimg, 'RGB')))
+		
+		# render the atlas into a texture array
+		prog = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER), _shader_font_source)
+		
+		gl.glViewport(0, 0, 64, 64)
+		gl.glDisable(GL_DEPTH_TEST)
+		
+		gl.glUseProgram(prog)
+		gl.glUniform1i(gl.glGetUniformLocation(prog, 'sampler_fontatlas'), 0)
+		
+		self._draw_dummy(instances=256)
+		
+		gl.glUseProgram(0)
+		gl.glDeleteFramebuffers(1, fbo)
+		gl.glDeleteTextures(1, tex_font_atlas)
+		
+		gl.glGenerateMipmap(GL_TEXTURE_2D_ARRAY)
+		self._tex_font = tex_font
+		
 	# }
 	
 	def _resize(self, w, h, _last = [(1, 1)]):
@@ -444,7 +519,7 @@ class AsciiRenderer:
 		gl.glActiveTexture(GL_TEXTURE0)
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_text)
 		gl.glActiveTexture(GL_TEXTURE1)
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_font)
+		gl.glBindTexture(GL_TEXTURE_2D_ARRAY, self._tex_font)
 		
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
 		gl.glViewport(0, 0, w, h)
