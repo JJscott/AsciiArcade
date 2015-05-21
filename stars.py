@@ -42,14 +42,16 @@ class Stars(object):
 	def tick(self, pressed):
 		# Update all objects in the scene
 		#
-		for obj in self.scene:
+		scene_itr = self.scene[:]
+		for obj in scene_itr:
 			obj.update(self.scene, pressed)
 
 		# Process results of update
 		#
 		if self.ship.dead:
 			#HACKY HACKY RESET
-			self.reset()
+			if pressed[K_SPACE]:
+				self.reset()
 
 
 
@@ -99,6 +101,12 @@ class Ship(object):
 	def update(self, scene, pressed):
 
 		if not self.dead:
+			# Update target
+			#
+
+			# Check "shots fired"
+			#
+
 			# Update position
 			#
 			dx = 0
@@ -119,8 +127,6 @@ class Ship(object):
 			self.position = self.position + vec3([0, 0, -self.speed])
 			self.speed *= 1.001
 
-			# Update target
-			#
 
 			# Colision detection
 			#
