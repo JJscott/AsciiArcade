@@ -59,13 +59,26 @@ _shader_ascii_source = _shader_fullscreen_source + '''
 uniform ivec2 char_size;
 uniform sampler2D sampler_color;
 uniform sampler2D sampler_depth;
+uniform sampler1D sampler_lum2ascii;
 
 #ifdef _FRAGMENT_
 
 out vec4 frag_ascii;
 
+vec3 color_avg() {
+	vec3 c;
+	for (int i = 0; i < char_size.x; i++) {
+		for (int j = 0; j < char_size.y; j++) {
+			c += texelFetch(sampler_color, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).rgb;
+		}
+	}
+	return c / float(char_size.x * char_size.y);
+}
+
 void main() {
-	frag_ascii = vec4(texture(sampler_color, texCoord).rgb, 75.5 / 255.0);
+	float lum = dot(vec3(0.2126, 0.7152, 0.0722), color_avg());
+	int codepoint = int(floor(texture(sampler_lum2ascii, lum).r * 255.0 + 0.5));
+	frag_ascii = vec4(vec3(0.0), (float(codepoint) + 0.5) / 255.0);
 }
 
 #endif
@@ -89,7 +102,7 @@ flat out int codepoint;
 void main() {
 	gl_Position = vec4(pos, 0.0, 1.0);
 	texCoord = vec2(0.5) + 0.5 * pos;
-	vec4 rgba = texture(sampler_text, texCoord);
+	vec4 rgba = texelFetch(sampler_text, ivec2(floor(texCoord * vec2(textureSize(sampler_text, 0)))), 0);
 	color = rgba.rgb;
 	codepoint = int(floor(rgba.a * 255.0));
 }
@@ -105,9 +118,7 @@ flat in int codepoint;
 
 out vec4 frag_color;
 
-vec4 textureFont(int c) {
-	// TODO discontinuities screw up gradients for this => line artefacts from excessive lod-ing
-	vec2 uv = mod(vec2(1.0, -1.0) * texCoord * vec2(textureSize(sampler_text, 0)), vec2(1.0));
+vec4 textureFont(int c, vec2 uv) {
 	uv.x *= 0.75;
 	int ix = c & 0xF;
 	int iy = c >> 4;
@@ -115,7 +126,9 @@ vec4 textureFont(int c) {
 }
 
 void main() {
-	frag_color = vec4(mix(bgcolor, color, vec3(textureFont(codepoint).r)), 1.0);
+	// TODO discontinuities screw up gradients for this => line artefacts from excessive lod-ing
+	vec2 fontuv = mod(vec2(1.0, -1.0) * texCoord * vec2(textureSize(sampler_text, 0)), vec2(1.0));
+	frag_color = vec4(mix(bgcolor, color, vec3(textureFont(codepoint, fontuv).r)), 1.0);
 }
 
 #endif
@@ -140,9 +153,9 @@ class AsciiRenderer:
 		gl.glActiveTexture(GL_TEXTURE0)
 		
 		# font texture
-		self._tex_font = GLuint(0)
-		
 		fontimg = pygame.image.load('./res/font.png')
+		self._tex_font = GLuint(0)
+		gl.glGenTextures(1, self._tex_font)
 		
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_font)
 		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -153,6 +166,18 @@ class AsciiRenderer:
 		# this feels disgusting
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, fontimg.get_width(), fontimg.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, ctypes.create_string_buffer(pygame.image.tostring(fontimg, 'RGB')))
 		gl.glGenerateMipmap(GL_TEXTURE_2D)
+		
+		# luminance to ASCII texture (1D)
+		lumstr = '#MNXI*:\'. '
+		self._tex_lum2ascii = GLuint(0)
+		gl.glGenTextures(1, self._tex_lum2ascii)
+		
+		gl.glBindTexture(GL_TEXTURE_1D, self._tex_lum2ascii)
+		gl.glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+		gl.glTexImage1D(GL_TEXTURE_1D, 0, GL_R8, len(lumstr), 0, GL_RED, GL_UNSIGNED_BYTE, ctypes.create_string_buffer(lumstr))
 		
 		# main FBO
 		self._fbo_main = GLuint(0)
@@ -378,6 +403,8 @@ class AsciiRenderer:
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color) # TODO edge
 		gl.glActiveTexture(GL_TEXTURE1)
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
+		gl.glActiveTexture(GL_TEXTURE2)
+		gl.glBindTexture(GL_TEXTURE_1D, self._tex_lum2ascii)
 		
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_text)
 		gl.glViewport(0, 0, *self._text_size)
@@ -386,6 +413,7 @@ class AsciiRenderer:
 		gl.glUniform2i(gl.glGetUniformLocation(prog_ascii, 'char_size'), *self._char_size)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_color'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_depth'), 1)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_lum2ascii'), 2)
 		
 		self._draw_dummy()
 		
