@@ -29,7 +29,7 @@ class Stars(object):
 		self.ship = Ship()
 		self.scene.append(self.ship)
 
-		for _ in range(100):
+		for _ in range(50):
 			self.scene.append(Astroid( (
 				randrange(-5, 5),
 				randrange(-5, 5),
@@ -97,8 +97,12 @@ class Ship(object):
 		self.dead = False
 
 	def get_view_matrix(self):
-		cam_pos = vec3([0, 0, self.position.z + 10])
-		return mat4.translate(cam_pos[0], cam_pos[1], cam_pos[2])
+		cam_pos = vec3([0, 0, 15])
+		cam_Xrot = -math.pi / 6
+		ship_pos =  vec3([0, 0, self.position.z])
+		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
+			mat4.rotateX(cam_Xrot) *
+			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z))
 
 		
 	def update(self, scene, pressed):
@@ -123,7 +127,11 @@ class Ship(object):
 			move = vec3([dx, dy, 0])
 
 			if move.mag() != 0:
-				self.position = self.position + (move.unit() * 0.2) # TODO paramaterize speed
+				move = move.unit() * 0.2 # parameterize screen move speed
+				nx = max(min(self.position.x + move.x, 5), -5) # parametirze screen bounds?
+				ny = max(min(self.position.y + move.y, 4), -4)
+				self.position = vec3([nx, ny, self.position.z]) 
+
 
 			# Move foward
 			#
@@ -177,10 +185,10 @@ class Astroid(object):
 	def draw(self, gl, proj, view):
 		if not cube_init:
 			initCube(gl)
-
+		scale = mat4.scale(2.5,2.5,2.5)
 		trans = mat4.translate(self.position.x, self.position.y, self.position.z)
 		rotate = self.orientation
-		mv = view * trans * rotate
+		mv = view * trans * rotate * scale
 
 		# Render
 		# 
@@ -191,7 +199,7 @@ class Astroid(object):
 
 
 	def get_sphere(self):
-		return sphere(self.position, 1) #TODO change radius of astroid
+		return sphere(self.position, 2.5) #TODO change radius of astroid
 
 
 
