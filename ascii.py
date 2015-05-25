@@ -90,10 +90,40 @@ void main() {
 
 _shader_edge_source = _shader_fullscreen_source + '''
 
+uniform sampler2D sampler_color;
+uniform sampler2D sampler_depth;
+
+uniform mat4 proj_inv;
+
 #ifdef _FRAGMENT_
+
+// output is RGB-edge
+out vec4 frag_color;
+
+const vec2[] deltas = vec2[](vec2(1, 0), vec2(0, 1), vec2(-1, 0), vec2(0, -1));
+
+float texture_depth(vec2 uv) {
+	float d0 = texture(sampler_depth, uv).r;
+	d0 = d0 * 2.0 - 1.0;
+	vec4 p = proj_inv * vec4(0, 0, d0, 1);
+	p /= p.w;
+	return -p.z;
+}
 
 void main() {
 	
+	bool edgy = false;
+	
+	// edges from depth buffer
+	float depth = texture_depth(fullscreen_tex_coord);
+	float depth_l = -depth;
+	for (int i = 0; i < deltas.length(); i++) {
+		depth_l += 0.25 * texture_depth(fullscreen_tex_coord + deltas[i] / vec2(textureSize(sampler_color, 0)));
+	}
+	edgy = edgy || abs(depth_l / depth) > 0.03;
+	
+	// passthrough color, add edginess
+	frag_color = vec4(texture(sampler_color, fullscreen_tex_coord).rgb, mix(0.0, 1.0, edgy));
 }
 
 #endif
@@ -134,6 +164,9 @@ _shader_text_source = '''
 uniform sampler2D sampler_text;
 uniform sampler2DArray sampler_font;
 
+// passthrough for testing
+uniform sampler2D sampler_color;
+
 const vec3 bgcolor = vec3(1.0);
 
 const vec2 char_uvlim = vec2(0.75, 1.0);
@@ -164,15 +197,16 @@ flat in int codepoint;
 
 out vec4 frag_color;
 
-vec4 textureFont(int c, vec2 uv) {
+vec4 texture_font(int c, vec2 uv) {
 	// manual grad to avoid discontinuities from mod()
 	// can't use repeat wrap mode instead of mod because we have to reduce uv to fit char bounding box
 	return textureGrad(sampler_font, vec3(mod(uv, vec2(1.0)) * char_uvlim, codepoint), dFdx(uv * char_uvlim), dFdy(uv * char_uvlim));
 }
 
 void main() {
-	float f = textureFont(codepoint, fullscreen_tex_coord * vec2(textureSize(sampler_text, 0))).r;
+	float f = texture_font(codepoint, fullscreen_tex_coord * vec2(textureSize(sampler_text, 0))).r;
 	frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
+	//frag_color = vec4(vec3(texture(sampler_color, fullscreen_tex_coord).a), 1.0);
 }
 
 #endif
@@ -467,17 +501,39 @@ class AsciiRenderer:
 		# render game to color + depth framebuffer
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_main)
 		gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+		gl.glClearDepth(1.0)
 		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 		gl.glEnable(GL_DEPTH_TEST)
 		gl.glDepthFunc(GL_LESS)
 		gl.glViewport(0, 0, *self._img_size)
 		
-		game.render(gl, *self._img_size)
+		proj = game.render(gl, *self._img_size)
 		
 		gl.glDisable(GL_DEPTH_TEST)
 		
-		# TODO do edge detection
+		# edge detection
 		# output texture is (original) color + edginess
+		
+		prog_edge = _cache.get('prog_edge', None)
+		if not prog_edge:
+			prog_edge = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER), _shader_edge_source)
+			_cache['prog_edge'] = prog_edge
+		# }
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color)
+		gl.glActiveTexture(GL_TEXTURE1)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
+		
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_edge)
+		gl.glViewport(0, 0, *self._img_size)
+		
+		gl.glUseProgram(prog_edge)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_color'), 0)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_depth'), 1)
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog_edge, 'proj_inv'), 1, True, c_array(GLfloat, proj.inverse().flatten()))
+		
+		self._draw_dummy()
 		
 		# ASCII conversion
 		# output texture is (new) color + ascii code
@@ -489,7 +545,7 @@ class AsciiRenderer:
 		# }
 		
 		gl.glActiveTexture(GL_TEXTURE0)
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color) # TODO edge
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge)
 		gl.glActiveTexture(GL_TEXTURE1)
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
 		gl.glActiveTexture(GL_TEXTURE2)
@@ -520,6 +576,8 @@ class AsciiRenderer:
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_text)
 		gl.glActiveTexture(GL_TEXTURE1)
 		gl.glBindTexture(GL_TEXTURE_2D_ARRAY, self._tex_font)
+		gl.glActiveTexture(GL_TEXTURE2)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge)
 		
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
 		gl.glViewport(0, 0, w, h)
@@ -528,6 +586,7 @@ class AsciiRenderer:
 		gl.glUseProgram(prog_text)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_text'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_font'), 1)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_color'), 2) # passthrough for testing
 		
 		self._draw_ascii_grid(*self._text_size)
 		
