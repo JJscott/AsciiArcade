@@ -28,13 +28,7 @@ class Stars(object):
 		self.scene = []
 		self.ship = Ship()
 		self.scene.append(self.ship)
-
-		for _ in range(50):
-			self.scene.append(Astroid( (
-				randrange(-5, 5),
-				randrange(-5, 5),
-				randrange(-1000, -5)
-				) ))
+		self.scene.append(AsteroidField())
 
 
 	# Game logic
@@ -87,14 +81,75 @@ class Stars(object):
 
 
 
+class Bullet(object):
+	"""docstring for Bullet"""
+	def __init__(self, pos):
+		super(Bullet, self).__init__()
+		self.position = pos
+
+	def get_position(self):
+		return self.position
+
+	def update(self, scene, pressed):
+		self.position = self.position + vec3([0, 0, -3.0])
+
+	def draw(self, gl, proj, view):
+		global cube_init
+		if not cube_init:
+			initCube(gl)
+
+		model = mat4.translate(self.position.x, self.position.y, self.position.z)
+		scale = mat4.scale(0.25,0.25,0.25)
+		mv = view * model * scale
+
+		# Render
+		# 
+		renderCube(
+			gl,
+			pygloo.c_array(GLfloat, proj.flatten()),
+			pygloo.c_array(GLfloat, mv.flatten()) );
+	# }
+# }
+
+
+class BulletCollection(object):
+	"""docstring for BulletCollection"""
+	def __init__(self, ship):
+		super(BulletCollection, self).__init__()
+		self.ship = ship
+		self.bullet_list = []
+
+	def update(self, scene, pressed):
+		ship_z = self.ship.get_position().z
+		self.bullet_list = [b for b in self.bullet_list if b.get_position().z - ship_z < 100 ] # TODO cleanup / removes if it gets 100 away from the ship
+		for b in self.bullet_list:
+			b.update(scene, pressed)
+
+
+	def draw(self, gl, proj, view):
+		for b in self.bullet_list:
+			b.draw(gl, proj, view)
+		
+
+	def add_bullet(self, position):
+		self.bullet_list.append(Bullet(position))
+
+
 
 class Ship(object):
+
 	"""docstring for Ship"""
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
 		self.speed = 0.1
 		self.dead = False
+		self.bullets = BulletCollection(self)
+		self.fired = False
+		self.cooldown = 0
+
+	def get_position(self):
+		return self.position
 
 	def get_view_matrix(self):
 		cam_pos = vec3([0, 0, 15])
@@ -107,12 +162,27 @@ class Ship(object):
 		
 	def update(self, scene, pressed):
 
+		self.bullets.update(scene, pressed)
+
 		if not self.dead:
 			# Update target
 			#
 
 			# Check "shots fired"
 			#
+			if pressed[K_SPACE]:
+				if not self.fired and self.cooldown <= 0:
+					self.bullets.add_bullet(self.position + vec3([0.5, 0, 0]) )
+					self.bullets.add_bullet(self.position - vec3([0.5, 0, 0]) )
+					self.cooldown = 5
+				self.fired = True
+			else:
+				self.fired = False
+
+
+			# Update cooldown on weapons
+			# 
+			self.cooldown -= 1
 
 			# Update position
 			#
@@ -141,22 +211,28 @@ class Ship(object):
 
 			# Colision detection
 			#
-			my_s = sphere(self.position, 1) # my sphere
-			ss = [obj.get_sphere() for obj in scene if isinstance(obj, Astroid)]
-			for s in ss:
-				if my_s.sphere_intersection(s) < 0 :
-					self.dead = True
-					break;
-				# } 
+			ship_spheres = [sphere(self.position, 1)] # change this my sphere
+
+			all_spheres = [af.getCollisionSpheres() for af in scene if isinstance(af, AsteroidField)]
+			if len(all_spheres) > 0:
+				ast_field_sphere = all_spheres[0]
+
+				if any( ship_sphere.sphere_intersection(ast_sphere) for ship_sphere in ship_spheres for ast_sphere in ast_field_sphere ):
+					# self.dead = True
+					pass
+				# }
 			# }
 		# }
-
+	# }
 
 
 
 	def draw(self, gl, proj, view):
+		global cube_init
 		if not cube_init:
 			initCube(gl)
+
+		self.bullets.draw(gl, proj, view)
 
 		model = mat4.translate(self.position.x, self.position.y, self.position.z)
 		mv = view * model
@@ -169,20 +245,24 @@ class Ship(object):
 			pygloo.c_array(GLfloat, mv.flatten()) );
 
 		# TODO render firing target
+	# }
 
 
-class Astroid(object):
-	"""docstring for Astroid"""
+class Asteroid(object):
+	"""docstring for Asteroid"""
 	def __init__(self, pos, vel=(0,0,0)):
-		super(Astroid, self).__init__()
+		super(Asteroid, self).__init__()
 		self.position = vec3(pos)
 		self.velocity = vec3(vel)
 		self.orientation = mat4.rotateY(random() * math.pi * 2) * mat4.rotateX(random() * math.pi - math.pi/2)
-	
+	# }
+
 	def update(self, scene, pressed):
 		self.position = self.position + self.velocity
+	# }
 
 	def draw(self, gl, proj, view):
+		global cube_init
 		if not cube_init:
 			initCube(gl)
 		scale = mat4.scale(2.5,2.5,2.5)
@@ -199,9 +279,43 @@ class Astroid(object):
 
 
 	def get_sphere(self):
-		return sphere(self.position, 2.5) #TODO change radius of astroid
+		return sphere(self.position, 2.5) #TODO change radius of asteroid
+	# }
+# }
+
+class AsteroidField(object):
+
+	"""docstring for AsteroidField"""
+	def __init__(self):
+		super(AsteroidField, self).__init__()
+		self.asteroid_list = []
+		for _ in range(50):
+			self.asteroid_list.append(Asteroid( (
+				randrange(-5, 5),
+				randrange(-5, 5),
+				randrange(-1000, -5)
+				) ))
+		# }
+	# }
+
+	def update(self, scene, pressed):
+		for a in self.asteroid_list:
+			a.update(scene, pressed)
+	# }
 
 
+	def draw(self, gl, proj, view):
+		for a in self.asteroid_list:
+			a.draw(gl, proj, view)
+	# }
+
+
+
+	def getCollisionSpheres(self):
+		# Need t return a generator for all the asteroids
+		return [a.get_sphere() for a in self.asteroid_list]
+	# }
+# }
 
 
 
