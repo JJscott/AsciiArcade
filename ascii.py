@@ -3,6 +3,7 @@ from __future__ import division
 
 import pygame
 import ctypes
+import itertools
 from pygloo import *
 from simpleShader import makeProgram
 
@@ -132,9 +133,10 @@ void main() {
 _shader_ascii_source = _shader_fullscreen_source + '''
 
 uniform ivec2 char_size;
-uniform sampler2D sampler_color;
+uniform sampler2D sampler_color; // RGB-edge
 uniform sampler2D sampler_depth;
 uniform sampler1D sampler_lum2ascii;
+uniform vec3 fgcolor;
 
 #ifdef _FRAGMENT_
 
@@ -153,7 +155,45 @@ vec3 color_avg() {
 void main() {
 	float lum = dot(vec3(0.2126, 0.7152, 0.0722), color_avg());
 	int codepoint = int(floor(texture(sampler_lum2ascii, lum).r * 255.0 + 0.5));
-	frag_ascii = vec4(vec3(0.0), (float(codepoint) + 0.5) / 255.0);
+	frag_ascii = vec4(fgcolor, (float(codepoint) + 0.5) / 255.0);
+}
+
+#endif
+'''
+
+_shader_dtext_source = '''
+
+uniform ivec2 viewport_size;
+
+#ifdef _VERTEX_
+
+layout(location = 0) in vec4 pos;
+
+// RGB-ASCII
+layout(location = 1) in vec4 color;
+
+out VertexData {
+	vec4 color;
+} vertex_out;
+
+void main() {
+	vec2 origin = pos.zw;
+	gl_Position = vec4(mod((pos.xy + 0.5) / vec2(viewport_size) + origin, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+	vertex_out.color = color;
+}
+
+#endif
+
+#ifdef _FRAGMENT_
+
+in VertexData {
+	vec4 color;
+} vertex_in;
+
+out vec4 frag_color;
+
+void main() {
+	frag_color = vertex_in.color;
 }
 
 #endif
@@ -167,7 +207,7 @@ uniform sampler2DArray sampler_font;
 // passthrough for testing
 uniform sampler2D sampler_color;
 
-const vec3 bgcolor = vec3(1.0);
+uniform vec3 bgcolor;
 
 const vec2 char_uvlim = vec2(0.75, 1.0);
 
@@ -182,7 +222,7 @@ flat out int codepoint;
 void main() {
 	gl_Position = vec4(pos, 0.0, 1.0);
 	fullscreen_tex_coord = vec2(0.5) + 0.5 * pos;
-	vec4 rgba = texelFetch(sampler_text, ivec2(floor(fullscreen_tex_coord * vec2(textureSize(sampler_text, 0)))), 0);
+	vec4 rgba = texelFetch(sampler_text, ivec2(floor(fullscreen_tex_coord * vec2(textureSize(sampler_text, 0)) + 0.5)), 0);
 	textcolor = rgba.rgb;
 	codepoint = int(floor(rgba.a * 255.0));
 }
@@ -224,6 +264,10 @@ class AsciiRenderer:
 		
 		# text screen buffer (w, h)
 		self._text_size = (0, 80)
+		
+		# colors
+		self.fgcolor = (0, 0, 0)
+		self.bgcolor = (1, 1, 1)
 		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
@@ -321,8 +365,32 @@ class AsciiRenderer:
 		gl.glBindTexture(GL_TEXTURE_2D, 0)
 		
 		# pending direct text
-		# (row, col, color, text)
-		self._direct_text = []
+		self._dtext_pos = [] # x, y, screen origin
+		self._dtext_color = [] # r, g, b, ascii
+		
+		self._vao_dtext = GLuint(0)
+		self._vbo_dtext_pos = GLuint(0) # x, y, screen origin
+		self._vbo_dtext_color = GLuint(0) # r, g, b, ascii
+		
+		gl.glGenVertexArrays(1, self._vao_dtext)
+		gl.glGenBuffers(1, self._vbo_dtext_pos)
+		gl.glGenBuffers(1, self._vbo_dtext_color)
+		
+		gl.glBindVertexArray(self._vao_dtext)
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, self._vbo_dtext_pos)
+		gl.glBufferData(GL_ARRAY_BUFFER, 4 * ctypes.sizeof(GLfloat), c_array(GLfloat, (0, 0, 0, 0)), GL_STREAM_DRAW)
+		gl.glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, None)
+		gl.glEnableVertexAttribArray(0)
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, self._vbo_dtext_color)
+		gl.glBufferData(GL_ARRAY_BUFFER, 4 * ctypes.sizeof(GLfloat), c_array(GLfloat, (0, 0, 0, 0)), GL_STREAM_DRAW)
+		gl.glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, None)
+		gl.glEnableVertexAttribArray(1)
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, 0)
+		gl.glBindVertexArray(0)
+		
 	# }
 	
 	def _init_font(self):
@@ -382,10 +450,13 @@ class AsciiRenderer:
 		
 	# }
 	
-	def _resize(self, w, h, _last = [(1, 1)]):
+	def resize(self, w, h, _last = [(1, 1)]):
+		'''
+		Resize internal textures for a specific screen size.
+		'''
 		if (w, h) == _last[0]: return
 		_last[0] = (w, h)
-		print 'resize motherfucker!'
+		#print 'resize motherfucker!'
 		
 		gl = self.gl
 		
@@ -491,12 +562,49 @@ class AsciiRenderer:
 		gl.glBindVertexArray(0)
 	# }
 	
+	def _draw_direct_text(self, _cache = {}):
+		gl = self.gl
+		
+		# if no text, do nothing
+		if not len(self._dtext_pos): return
+		
+		#print self._dtext_pos
+		#print self._dtext_color
+		
+		# upload new text data
+		gl.glBindBuffer(GL_ARRAY_BUFFER, self._vbo_dtext_pos)
+		gl.glBufferData(GL_ARRAY_BUFFER, len(self._dtext_pos) * ctypes.sizeof(GLfloat), c_array(GLfloat, self._dtext_pos), GL_STREAM_DRAW)
+		gl.glBindBuffer(GL_ARRAY_BUFFER, self._vbo_dtext_color)
+		gl.glBufferData(GL_ARRAY_BUFFER, len(self._dtext_color) * ctypes.sizeof(GLfloat), c_array(GLfloat, self._dtext_color), GL_STREAM_DRAW)
+		
+		prog_dtext = _cache.get('prog_dtext', None)
+		if not prog_dtext:
+			prog_dtext = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_FRAGMENT_SHADER), _shader_dtext_source)
+			_cache['prog_dtext'] = prog_dtext
+		# }
+		
+		gl.glUseProgram(prog_dtext)
+		
+		gl.glUniform2i(gl.glGetUniformLocation(prog_dtext, 'viewport_size'), *self._text_size)
+		
+		gl.glBindVertexArray(self._vao_dtext)
+		gl.glDrawArrays(GL_POINTS, 0, len(self._dtext_pos) // 2)
+		gl.glBindVertexArray(0)
+		
+		# clear text after drawing
+		self._dtext_pos = []
+		self._dtext_color = []
+	# }
+	
 	def render(self, w, h, game, _cache = {}):
 		gl = self.gl
 		
+		# temp
+		self.draw_text(0, 0, 'Hello World!\nBastards, the lot of you.', color = (0.5, 0, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
+		
 		if (w, h) == (0, 0): return
 		
-		self._resize(w, h)
+		self.resize(w, h)
 		
 		# render game to color + depth framebuffer
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_main)
@@ -559,10 +667,12 @@ class AsciiRenderer:
 		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_color'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_depth'), 1)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_ascii, 'sampler_lum2ascii'), 2)
+		gl.glUniform3f(gl.glGetUniformLocation(prog_ascii, 'fgcolor'), *self.fgcolor)
 		
 		self._draw_dummy()
 		
-		# TODO render strings into ascii texture (glTexSubImage2D?)
+		# render strings into ascii texture
+		self._draw_direct_text()
 		
 		# real output: convert ASCII codes to text via font atlas
 		
@@ -587,14 +697,58 @@ class AsciiRenderer:
 		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_text'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_font'), 1)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_text, 'sampler_color'), 2) # passthrough for testing
+		gl.glUniform3f(gl.glGetUniformLocation(prog_text, 'bgcolor'), *self.bgcolor)
 		
 		self._draw_ascii_grid(*self._text_size)
 		
 		gl.glUseProgram(0)
 	# }
 	
-	def draw_text(self, row, col, text, color = (0.0, 0.0, 0.0)):
-		pass
+	def draw_text(self, x, y, text, chardelta = (1, 0), linedelta = (0, -1), align = 'l', textorigin = (0, 0), screenorigin = (0, 0), color = None):
+		'''
+		Draw some (coloured) text. Align text region origin with screen origin, then offset text position by x,y
+		
+		Parameters:
+			x, y           Offset from aligned origins, in characters
+			text           Text to draw (str)
+			chardelta      Position delta between characters within a line of text (units are characters); default is (1,0)
+			linedelta      Position delta between lines of text (units are characters); default is (0,-1)
+			align          Alignment within lines; one of 'l' (left / line start), 'c' (centre), 'r' (right / line end); default is 'l'
+			textorigin     Origin point within text region; range is [0,1]; default is (0,0)
+			screenorigin   Origin point on screen; range is [0,1]; default is (0,0)
+			color          Text colour; default is current foreground colour
+			
+		'''
+		color = self.fgcolor if color is None else color
+		color = tuple(color)[:3]
+		chardelta = tuple(chardelta)[:2]
+		linedelta = tuple(linedelta)[:2]
+		textorigin = tuple(textorigin)[:2]
+		screenorigin = tuple(screenorigin)[:2]
+		lines = str(text).split('\n')
+		# width and height of text
+		tw = max(map(len, lines))
+		th = len(lines)
+		# prepare alignment
+		padfactor = { 'c' : 0.5, 'r' : 1.0 }.get(align, 0.0)
+		padsizes = [padfactor * (tw - len(line)) for line in lines]
+		# text origin
+		x -= tw * textorigin[0]
+		y -= th * textorigin[1]
+		# process lines...
+		from itertools import chain, izip, imap, repeat
+		for line, psize in izip(lines, padsizes):
+			# align
+			x0 = x + chardelta[0] * psize
+			y0 = y + chardelta[1] * psize
+			# write buffers
+			self._dtext_pos.extend(chain.from_iterable(izip(*([(x0 + chardelta[0] * f for f in xrange(len(line))), (y0 + chardelta[1] * f for f in xrange(len(line)))] + [repeat(f) for f in screenorigin]))))
+			self._dtext_color.extend(chain.from_iterable(izip(*([repeat(f, len(line)) for f in color] + [imap(lambda c: (ord(c) + 0.5) / 255.0, line)]))))
+			# newline
+			x += linedelta[0]
+			y += linedelta[1]
+		# }
+		
 	# }
 	
 # }
