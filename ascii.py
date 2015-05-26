@@ -268,8 +268,8 @@ class AsciiRenderer:
 		self._text_size = (0, 80)
 		
 		# colors
-		self.fgcolor = (0, 0, 0)
-		self.bgcolor = (1, 1, 1)
+		self.fgcolor = (1, 1, 1)
+		self.bgcolor = (0, 0, 0)
 		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
@@ -601,8 +601,27 @@ class AsciiRenderer:
 	def render(self, w, h, game, _cache = {}):
 		gl = self.gl
 		
+		art1 = '''
+     ___           _______.  ______  __   __  
+    /   \         /       | /      ||  | |  | 
+   /  ^  \       |   (----`|  ,----'|  | |  | 
+  /  /_\  \       \   \    |  |     |  | |  | 
+ /  _____  \  .----)   |   |  `----.|  | |  | 
+/__/     \__\ |_______/     \______||__| |__| 
+'''                            
+		
+		art2 = '''
+     ___      .______        ______     ___       _______   _______ 
+    /   \     |   _  \      /      |   /   \     |       \ |   ____|
+   /  ^  \    |  |_)  |    |  ,----'  /  ^  \    |  .--.  ||  |__   
+  /  /_\  \   |      /     |  |      /  /_\  \   |  |  |  ||   __|  
+ /  _____  \  |  |\  \----.|  `----./  _____  \  |  '--'  ||  |____ 
+/__/     \__\ | _| `._____| \______/__/     \__\ |_______/ |_______|
+'''
+		
 		# temp
-		self.draw_text(0, 0, 'Hello World!\nBastards, the lot of you.', color = (0.5, 0, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
+		self.draw_text(0, 0, art1, color = (0, 0.9, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
+		self.draw_text(0, 0, art2, color = (1, 0, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
 		
 		if (w, h) == (0, 0): return
 		
@@ -735,8 +754,9 @@ class AsciiRenderer:
 		padfactor = { 'c' : 0.5, 'r' : 1.0 }.get(align, 0.0)
 		padsizes = [padfactor * (tw - len(line)) for line in lines]
 		# text origin
-		x -= tw * textorigin[0]
-		y -= th * textorigin[1]
+		# TODO test / check this properly
+		x -= tw * textorigin[0] * chardelta[0] + th * textorigin[1] * linedelta[0]
+		y -= th * textorigin[1] * linedelta[1] + tw * textorigin[0] * chardelta[1]
 		# process lines...
 		from itertools import chain, izip, imap, repeat
 		for line, psize in izip(lines, padsizes):
