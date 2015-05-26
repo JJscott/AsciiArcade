@@ -16,43 +16,70 @@ from random import randrange, random
 # 
 from pygame.locals import *
 
+# Other stuff
+# 
+from GL_assets import *
 
-class Stars(object):
-	"""Stars"""
-	def __init__(self):
-		super(Stars, self).__init__()
+
+
+class StarsGame(object):
+	"""StarsGame"""
+	def __init__(self, gl):
+		super(StarsGame, self).__init__()
+
+		self.assets = GL_assets()
+
+		# Load geometry
+		# 
+		self.assets.load_geometry(gl, "bullet",		"Assets/Projectiles/ArrowHead.obj")
+		self.assets.load_geometry(gl, "asteroid1",	"Assets/Asteroids/AsteroidT1.obj")
+		self.assets.load_geometry(gl, "asteroid2",	"Assets/Asteroids/AsteroidT2.obj")
+		self.assets.load_geometry(gl, "asteroid3",	"Assets/Asteroids/AsteroidT3.obj")
+		self.assets.load_geometry(gl, "asteroid4",	"Assets/Asteroids/AsteroidT4.obj")
+		self.assets.load_geometry(gl, "asteroid5",	"Assets/Asteroids/AsteroidT5.obj")
+		self.assets.load_geometry(gl, "ship",		"Assets/Ship/ShipT.obj")
+
+		# Load shader
+		# 
+		self.assets.load_shader(gl, "bullet",	open("Assets/Shaders/bullet_shader.glsl").read())
+		self.assets.load_shader(gl, "asteroid",	open("Assets/Shaders/bullet_shader.glsl").read())
+		self.assets.load_shader(gl, "ship",		open("Assets/Shaders/bullet_shader.glsl").read())
+
 		self.reset()
-		
+
+		self.show_spheres = False
+			
 
 	def reset(self):
 		self.scene = []
 		self.ship = Ship()
 		self.scene.append(self.ship)
-
-		for _ in range(100):
-			self.scene.append(Astroid( (
-				randrange(-5, 5),
-				randrange(-5, 5),
-				randrange(-1000, -5)
-				) ))
-
+		self.level = AsteroidField((5,5))
+		self.scene.append(self.level)
+	
 
 	# Game logic
 	#
 	def tick(self, pressed):
+
+		# GameLogic
+		# 
+		if pressed[K_s]:
+			self.show_spheres = not self.show_spheres
+
 		# Update all objects in the scene
 		#
-		for obj in self.scene:
+		scene_itr = self.scene[:]
+		for obj in scene_itr:
 			obj.update(self.scene, pressed)
 
 		# Process results of update
 		#
 		if self.ship.dead:
 			#HACKY HACKY RESET
-			self.reset()
-
-
-
+			if pressed[K_SPACE]:
+				self.reset()
+						
 
 	# Render logic
 	#
@@ -68,16 +95,26 @@ class Stars(object):
 		# Render all objects in the scene
 		# 
 		for obj in self.scene:
-			obj.draw(gl, proj, view)
-		
+			obj.draw(gl, self.assets, proj, view)
+
+
+		# Debug colliding spheres
+		#
+		# if self.show_spheres:
+		# 	for sph in self.ship.get_sphere_list() + self.ship.bullets.get_sphere_list() + self.level.get_sphere_list():
+
+
+
+
+				
 		# ascii needs proj matrix
 		return proj
-		
+			
 	# TODO in Future
 	#
 	def render_GUI():
 		pass
-
+	
 	# TODO in Future
 	#
 	def render_GUI_ascii():
@@ -86,18 +123,114 @@ class Stars(object):
 
 
 
+
+
+
+class BulletCollection(object):
+	"""docstring for BulletCollection"""
+	def __init__(self, ship):
+		super(BulletCollection, self).__init__()
+		self.ship = ship
+		self.bullet_list = []
+	
+	def update(self, scene, pressed):
+		ship_z = self.ship.get_position().z
+		self.bullet_list = [b for b in self.bullet_list if b.get_position().z - ship_z < 100 ] # TODO cleanup / removes if it gets 100 away from the ship
+		for b in self.bullet_list:
+			b.update(scene, pressed)
+			
+
+	def draw(self, gl, assets, proj, view):
+		for b in self.bullet_list:
+			b.draw(gl, assets, proj, view)
+					
+
+	def add_bullet(self, position, speed):
+		self.bullet_list.append(Bullet(position, speed))
+
+	def get_sphere_list(self):
+		# Need t return a generator for all the asteroids
+		return [a.get_sphere() for a in self.asteroid_list]
+
+class Bullet(object):
+	"""docstring for Bullet"""
+	def __init__(self, pos, ship_speed):
+		super(Bullet, self).__init__()
+		self.position = pos
+		self.speed = 5 * ship_speed
+
+		self.vao = GLuint(0)
+		self.vao_size = 0
+	
+	def get_position(self):
+		return self.position
+
+	def get_sphere(self):
+		return [sphere(self.position, 0.25)]
+	
+	def update(self, scene, pressed):
+		self.position = self.position + vec3([0, 0, self.speed])
+	
+	def draw(self, gl, assets, proj, view):
+
+		# Set up matricies
+		#
+		model = mat4.scale(0.25,0.25,0.25)
+		position = mat4.translate(self.position.x, self.position.y, self.position.z)
+		mv = view * position * model
+
+		# Retreive model and shader
+		#
+		vao, vao_size = assets.get_geometry(tag="bullet")
+		prog = assets.get_shader(tag="bullet")
+
+		# Render
+		# 
+		gl.glUseProgram(prog)
+		gl.glBindVertexArray(vao)
+
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+
+	
+
+
+
+
+
+
+
 class Ship(object):
+
 	"""docstring for Ship"""
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
-		self.speed = 0.1
+		self.speed = -0.2
 		self.dead = False
+		self.bullets = BulletCollection(self)
+		self.fired = False
+		self.cooldown = 0
 
+		self.vao = GLuint(0)
+		self.vao_size = 0
+	
+	def get_position(self):
+		return self.position
+	
 	def get_view_matrix(self):
-		cam_pos = vec3([0, 0, self.position.z + 10])
-		return mat4.translate(cam_pos[0], cam_pos[1], cam_pos[2])
+		cam_pos = vec3([0, 0, 15])
+		cam_Xrot = -math.pi / 6
+		ship_pos =  vec3([0, 0, self.position.z])
+		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
+			mat4.rotateX(cam_Xrot) *
+			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z))
 
+	def get_sphere_list(self):
+		return [sphere(self.position, 1)]
+	
 		
 	def update(self, scene, pressed):
 
@@ -115,249 +248,162 @@ class Ship(object):
 			move = vec3([dx, dy, 0])
 
 			if move.mag() != 0:
-				self.position = self.position + (move.unit() * 0.2) # TODO paramaterize speed
+				move = move.unit() * 0.2 # parameterize screen move speed
+				nx = max(min(self.position.x + move.x, 5), -5) # parametirze screen bounds?
+				ny = max(min(self.position.y + move.y, 4), -4)
+				self.position = vec3([nx, ny, self.position.z])
+			
 
 			# Move foward
 			#
-			self.position = self.position + vec3([0, 0, -self.speed])
+			self.position = self.position + vec3([0, 0, self.speed])
 			self.speed *= 1.001
+
+
+			# Colision detection
+			#
+			ship_spheres = self.get_sphere_list()
+
+			all_spheres = [af.get_sphere_list() for af in scene if isinstance(af, AsteroidField)]
+			if len(all_spheres) > 0:
+				ast_field_sphere = all_spheres[0]
+
+				if any( ship_sphere.sphere_intersection(ast_sphere) <=0 for ship_sphere in ship_spheres for ast_sphere in ast_field_sphere ):
+					self.dead = True
+					pass
+							
 
 			# Update target
 			#
 
-			# Colision detection
+
+			# Update Bullets"
 			#
-			my_s = sphere(self.position, 1) # my sphere
-			ss = [obj.get_sphere() for obj in scene if isinstance(obj, Astroid)]
-			for s in ss:
-				if my_s.sphere_intersection(s) < 0 :
-					self.dead = True
-					break;
-				# } 
-			# }
-		# }
+			self.bullets.update(scene, pressed)
+			if pressed[K_SPACE]:
+				if not self.fired and self.cooldown <= 0:
+					self.bullets.add_bullet(self.position + vec3([0.5, 0, 0]), self.speed )
+					self.bullets.add_bullet(self.position - vec3([0.5, 0, 0]), self.speed )
+					self.cooldown = 5
+				self.fired = True
+			else:
+				self.fired = False
+			
+
+			# Update cooldown on weapons
+			# 
+			self.cooldown -= 1
+
+			
 
 
+	def draw(self, gl, assets, proj, view):
+		# Set up matricies
+		#
+		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
+		position = mat4.translate(self.position.x, self.position.y, self.position.z)
+		mv = view * position * model
 
-
-	def draw(self, gl, proj, view):
-		if not cube_init:
-			initCube(gl)
-
-		model = mat4.translate(self.position.x, self.position.y, self.position.z)
-		mv = view * model
+		# Retreive model and shader
+		#
+		vao, vao_size = assets.get_geometry(tag="ship")
+		prog = assets.get_shader(tag="ship")
 
 		# Render
 		# 
-		renderCube(
-			gl,
-			pygloo.c_array(GLfloat, proj.flatten()),
-			pygloo.c_array(GLfloat, mv.flatten()) );
+		gl.glUseProgram(prog)
+		gl.glBindVertexArray(vao)
+
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+
 
 		# TODO render firing target
+		# 
+        
+		# Draw bullets
+		#
+		self.bullets.draw(gl, assets, proj, view)
+	
 
 
-class Astroid(object):
-	"""docstring for Astroid"""
+
+
+
+
+
+
+
+
+class AsteroidField(object):
+
+	"""docstring for AsteroidField"""
+	def __init__(self, (xbound, ybound) ):
+		super(AsteroidField, self).__init__()
+		self.asteroid_list = []
+		for _ in range(50):
+			pos = vec3(((random() - 0.5) * 2 * xbound, (random() - 0.5) * 2 * ybound, randrange(-1000, -5)))
+			vel = vec3((random()-0.5, random()-0.5, random()-0.5)).unit() * 0.01
+
+
+			self.asteroid_list.append(Asteroid(pos, vel) )
+			
+	def update(self, scene, pressed):
+		for a in self.asteroid_list:
+			a.update(scene, pressed)
+	
+
+	def draw(self, gl, assets, proj, view):
+		for a in self.asteroid_list:
+			a.draw(gl, assets, proj, view)
+	
+
+
+	def get_sphere_list(self):
+		# Need t return a generator for all the asteroids
+		return [a.get_sphere() for a in self.asteroid_list]
+
+
+class Asteroid(object):
+	"""docstring for Asteroid"""
 	def __init__(self, pos, vel=(0,0,0)):
-		super(Astroid, self).__init__()
+		super(Asteroid, self).__init__()
 		self.position = vec3(pos)
 		self.velocity = vec3(vel)
 		self.orientation = mat4.rotateY(random() * math.pi * 2) * mat4.rotateX(random() * math.pi - math.pi/2)
+
+		self.vao = GLuint(0)
+		self.vao_size = 0
 	
 	def update(self, scene, pressed):
 		self.position = self.position + self.velocity
+	
+	def draw(self, gl, assets, proj, view):
+		# Set up matricies
+		#
+		model = mat4.scale(2,2,2) * self.orientation
+		position = mat4.translate(self.position.x, self.position.y, self.position.z)
+		mv = view * position * model
 
-	def draw(self, gl, proj, view):
-		if not cube_init:
-			initCube(gl)
-
-		trans = mat4.translate(self.position.x, self.position.y, self.position.z)
-		rotate = self.orientation
-		mv = view * trans * rotate
+		# Retreive model and shader
+		#
+		vao, vao_size = assets.get_geometry(tag="asteroid1")
+		prog = assets.get_shader(tag="asteroid")
 
 		# Render
 		# 
-		renderCube(
-			gl,
-			pygloo.c_array(GLfloat, proj.flatten()),
-			pygloo.c_array(GLfloat, mv.flatten()) );
+		gl.glUseProgram(prog)
+		gl.glBindVertexArray(vao)
+
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
 
 
 	def get_sphere(self):
-		return sphere(self.position, 1) #TODO change radius of astroid
-
-
-
-
-
-
-
-
-
-
-
-prog = GLuint(0)
-vao = GLuint(0)
-cube_init = False;
-
-def initCube(gl):
-	global prog
-	global vao
-	global cube_init
-
-	cube_shader_source = """
-	/*
-	 *
-	 * Default shader program for writing to scene buffer using GL_TRIANGLES
-	 *
-	 */
-
-	uniform mat4 modelViewMatrix;
-	uniform mat4 projectionMatrix;
-
-	#ifdef _VERTEX_
-
-	layout(location = 0) in vec3 vertexPosition_modelspace;
-	layout(location = 1) in vec3 vertexColor;
-
-	out vec3 fragmentColor;
-
-	void main() {
-		vec3 pos_v = (modelViewMatrix * vec4(vertexPosition_modelspace, 1.0)).xyz;
-		gl_Position = projectionMatrix * vec4(pos_v, 1.0);
-		fragmentColor = vertexColor;
-	}
-
-	#endif
-
-
-	#ifdef _FRAGMENT_
-
-	in vec3 fragmentColor;
-	out vec3 color;
-
-	void main(){
-	    color = fragmentColor;
-	}
-
-	#endif
-	"""
-	prog = makeProgram(gl, "330 core", { GL_VERTEX_SHADER, GL_FRAGMENT_SHADER }, cube_shader_source)
-
-
-
-	# vertex positions
-	# 
-	pos_array = pygloo.c_array(GLfloat, [
-		-1.0, -1.0, -1.0,
-		-1.0, -1.0, 1.0,
-		-1.0, 1.0, 1.0,
-		1.0, 1.0, -1.0,
-		-1.0, -1.0, -1.0,
-		-1.0, 1.0, -1.0,
-		1.0, -1.0, 1.0,
-		-1.0, -1.0, -1.0,
-		1.0, -1.0, -1.0,
-		1.0, 1.0, -1.0,
-		1.0, -1.0, -1.0,
-		-1.0, -1.0, -1.0,
-		-1.0, -1.0, -1.0,
-		-1.0, 1.0, 1.0,
-		-1.0, 1.0, -1.0,
-		1.0, -1.0, 1.0,
-		-1.0, -1.0, 1.0,
-		-1.0, -1.0, -1.0,
-		-1.0, 1.0, 1.0,
-		-1.0, -1.0, 1.0,
-		1.0, -1.0, 1.0,
-		1.0, 1.0, 1.0,
-		1.0, -1.0, -1.0,
-		1.0, 1.0, -1.0,
-		1.0, -1.0, -1.0,
-		1.0, 1.0, 1.0,
-		1.0, -1.0, 1.0,
-		1.0, 1.0, 1.0,
-		1.0, 1.0, -1.0,
-		-1.0, 1.0, -1.0,
-		1.0, 1.0, 1.0,
-		-1.0, 1.0, -1.0,
-		-1.0, 1.0, 1.0,
-		1.0, 1.0, 1.0,
-		-1.0, 1.0, 1.0,
-		1.0, -1.0, 1.0])
-
-	# color positions
-	# 
-	col_array = pygloo.c_array(GLfloat, [
-		0.583, 0.771, 0.014,
-		0.609, 0.115, 0.436,
-		0.327, 0.483, 0.844,
-		0.822, 0.569, 0.201,
-		0.435, 0.602, 0.223,
-		0.310, 0.747, 0.185,
-		0.597, 0.770, 0.761,
-		0.559, 0.436, 0.730,
-		0.359, 0.583, 0.152,
-		0.483, 0.596, 0.789,
-		0.559, 0.861, 0.639,
-		0.195, 0.548, 0.859,
-		0.014, 0.184, 0.576,
-		0.771, 0.328, 0.970,
-		0.406, 0.615, 0.116,
-		0.676, 0.977, 0.133,
-		0.971, 0.572, 0.833,
-		0.140, 0.616, 0.489,
-		0.997, 0.513, 0.064,
-		0.945, 0.719, 0.592,
-		0.543, 0.021, 0.978,
-		0.279, 0.317, 0.505,
-		0.167, 0.620, 0.077,
-		0.347, 0.857, 0.137,
-		0.055, 0.953, 0.042,
-		0.714, 0.505, 0.345,
-		0.783, 0.290, 0.734,
-		0.722, 0.645, 0.174,
-		0.302, 0.455, 0.848,
-		0.225, 0.587, 0.040,
-		0.517, 0.713, 0.338,
-		0.053, 0.959, 0.120,
-		0.393, 0.621, 0.362,
-		0.673, 0.211, 0.457,
-		0.820, 0.883, 0.371,
-		0.982, 0.099, 0.879])
-
-	gl.glGenVertexArrays(1, vao)
-	gl.glBindVertexArray(vao)
-
-	vbo_pos = GLuint(0)
-	gl.glGenBuffers(1, vbo_pos)
-	gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_pos)
-	gl.glBufferData(GL_ARRAY_BUFFER, sizeof(pos_array), pos_array, GL_STATIC_DRAW)
-	gl.glEnableVertexAttribArray(0)
-	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0)
-
-	# //glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	vbo_col = GLuint(0)
-	gl.glGenBuffers(1, vbo_col)
-
-	gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_col)
-	gl.glBufferData(GL_ARRAY_BUFFER, sizeof(col_array), col_array, GL_STATIC_DRAW)
-	gl.glEnableVertexAttribArray(1)
-	gl.glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0)
-
-	gl.glBindBuffer(GL_ARRAY_BUFFER, 0)
-
-	gl.glBindVertexArray(0)
-	cube_init = True
-
-
-def renderCube(gl, proj, view):
-	gl.glUseProgram(prog)
-
-	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, view)
-	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, proj)
-
-	gl.glBindVertexArray(vao)
-	gl.glDrawArrays(GL_TRIANGLES, 0, 36)
+		return sphere(self.position, 2.0) #TODO change radius of asteroid
+	
+	

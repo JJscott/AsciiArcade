@@ -27,7 +27,7 @@ asciirenderer = None
 
 
 gl = None
-game = stars.Stars()
+game = None
 
 def render_normal(w, h):
 
@@ -66,6 +66,9 @@ def run():
 	
 	global gl
 	gl = pygloo.init()
+
+	global game
+	game = stars.StarsGame(gl)
 	
 	global asciirenderer
 	asciirenderer = ascii.AsciiRenderer(gl)
@@ -101,11 +104,7 @@ def run():
 		pressed = pygame.key.get_pressed()
 		game.tick(pressed)
 		
-		# if pressed[K_LEFT]:
-		# 	rotation_direction.y = +1.0
-		# elif pressed[K_RIGHT]:
-		# 	rotation_direction.y = -1.0
-				
+		
 		# Render
 		# 
 		if width > 0 and height > 0:
