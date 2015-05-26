@@ -217,12 +217,14 @@ layout(location = 0) in vec2 pos;
 
 out vec2 fullscreen_tex_coord;
 flat out vec3 textcolor;
+flat out ivec2 textpos;
 flat out int codepoint;
 
 void main() {
 	gl_Position = vec4(pos, 0.0, 1.0);
 	fullscreen_tex_coord = vec2(0.5) + 0.5 * pos;
-	vec4 rgba = texelFetch(sampler_text, ivec2(floor(fullscreen_tex_coord * vec2(textureSize(sampler_text, 0)) + 0.5)), 0);
+	textpos = ivec2(floor(fullscreen_tex_coord * vec2(textureSize(sampler_text, 0)) + 0.5));
+	vec4 rgba = texelFetch(sampler_text, textpos, 0);
 	textcolor = rgba.rgb;
 	codepoint = int(floor(rgba.a * 255.0));
 }
@@ -233,18 +235,18 @@ void main() {
 
 in vec2 fullscreen_tex_coord;
 flat in vec3 textcolor;
+flat in ivec2 textpos;
 flat in int codepoint;
 
 out vec4 frag_color;
 
-vec4 texture_font(int c, vec2 uv) {
-	// manual grad to avoid discontinuities from mod()
-	// can't use repeat wrap mode instead of mod because we have to reduce uv to fit char bounding box
-	return textureGrad(sampler_font, vec3(mod(uv, vec2(1.0)) * char_uvlim, codepoint), dFdx(uv * char_uvlim), dFdy(uv * char_uvlim));
-}
-
 void main() {
-	float f = texture_font(codepoint, fullscreen_tex_coord * vec2(textureSize(sampler_text, 0))).r;
+	vec2 fsuv = fullscreen_tex_coord * vec2(textureSize(sampler_text, 0));
+	// if fragment real position is outside this 'cell', we need to deal with it
+	vec2 uv = clamp(fsuv - vec2(textpos), vec2(0.0), vec2(1.0));
+	// manual grad to avoid discontinuities
+	float f = textureGrad(sampler_font, vec3(uv * char_uvlim, codepoint), dFdx(fsuv * char_uvlim), dFdy(fsuv * char_uvlim)).r;
+	// use font texture to interpolate between bg and fg
 	frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
 	//frag_color = vec4(vec3(texture(sampler_color, fullscreen_tex_coord).a), 1.0);
 }
