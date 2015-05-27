@@ -766,6 +766,12 @@ def _nullblock(w, h):
 	return '\n'.join(('\0' * w,) * h)
 # }
 
+def _floodfill_bg(text, o, r):
+	from itertools import izip, imap, repeat, chain
+	# i think this actually works...
+	return '\n'.join(imap(str.join, repeat(''), [[lines, list(imap(lambda points, visited, sentinel: [None if p in visited else [visited.add(p), [lines[p[1]].__setitem__(p[0], r), points.extend([(p[0] + dx, p[1] + dy) for dx, dy in [(1,0),(0,1),(-1,0),(0,-1)]]), sentinel.__setitem__(0, len(points))] if lines[p[1]][p[0]] == o else None] for p in [(p0[0] % len(lines[0]), p0[1] % len(lines)) for p0 in [[points.pop(), sentinel.__setitem__(0, len(points))][0]]]], repeat(list(chain(izip(repeat(0), xrange(len(lines))), izip(repeat(len(lines[0])-1), xrange(len(lines))), izip(xrange(len(lines[0])), repeat(0)), izip(xrange(len(lines[0])), repeat(len(lines)-1))))), repeat(set()), iter(lambda x=[1]: x, [0])))][0] for lines in (map(list, text.split('\n')),)][0]))
+# }
+
 def _load_aafont(fontname):
 	from itertools import izip, imap, chain, repeat, takewhile
 	font = {}
@@ -778,7 +784,8 @@ def _load_aafont(fontname):
 			begcol = min(len(list(takewhile(str.isspace, line))) for line in sprite)
 			endcol = max(len(line) - len(list(takewhile(str.isspace, reversed(line)))) for line in sprite)
 			sprite = '\n'.join([str.ljust(line, endcol)[begcol:endcol] for line in sprite])
-			# TODO replace outside spaces with \0 for transparent bg with solid fg
+			# replace outside spaces with \0 for transparent bg with solid fg
+			sprite = _floodfill_bg(sprite, ' ', '\0')
 			font[fontchar] = sprite
 		# }
 	# }
