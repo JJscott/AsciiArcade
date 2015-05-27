@@ -193,6 +193,8 @@ in VertexData {
 out vec4 frag_color;
 
 void main() {
+	// treat null char as transparent
+	if (vertex_in.color.a < (0.9 / 255.0)) discard;
 	frag_color = vertex_in.color;
 }
 
@@ -601,23 +603,8 @@ class AsciiRenderer:
 	def render(self, w, h, game, _cache = {}):
 		gl = self.gl
 		
-		art1 = '''
-     ___           _______.  ______  __   __  
-    /   \         /       | /      ||  | |  | 
-   /  ^  \       |   (----`|  ,----'|  | |  | 
-  /  /_\  \       \   \    |  |     |  | |  | 
- /  _____  \  .----)   |   |  `----.|  | |  | 
-/__/     \__\ |_______/     \______||__| |__| 
-'''                            
-		
-		art2 = '''
-     ___      .______        ______     ___       _______   _______ 
-    /   \     |   _  \      /      |   /   \     |       \ |   ____|
-   /  ^  \    |  |_)  |    |  ,----'  /  ^  \    |  .--.  ||  |__   
-  /  /_\  \   |      /     |  |      /  /_\  \   |  |  |  ||   __|  
- /  _____  \  |  |\  \----.|  `----./  _____  \  |  '--'  ||  |____ 
-/__/     \__\ | _| `._____| \______/__/     \__\ |_______/ |_______|
-'''
+		art1 = wordart('ASCII', 'big')
+		art2 = wordart('ARCADE', 'big')
 		
 		# temp
 		self.draw_text(0, 0, art1, color = (0, 0.9, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
@@ -775,12 +762,49 @@ class AsciiRenderer:
 	
 # }
 
+def _nullblock(w, h):
+	return '\n'.join(('\0' * w,) * h)
+# }
 
+def _load_aafont(fontname):
+	from itertools import izip, imap, chain, repeat, takewhile
+	font = {}
+	with open('./res/{0}.aafont'.format(fontname)) as file:
+		lines = file.readlines()
+		(nrows, nspacecols) = map(int, lines[0].split())
+		font[' '] = _nullblock(nspacecols, nrows)
+		charset = lines[1].strip()
+		for fontchar, sprite in izip(charset, izip(*([iter(lines[2:])] * nrows))):
+			begcol = min(len(list(takewhile(str.isspace, line))) for line in sprite)
+			endcol = max(len(line) - len(list(takewhile(str.isspace, reversed(line)))) for line in sprite)
+			sprite = '\n'.join([str.ljust(line, endcol)[begcol:endcol] for line in sprite])
+			# TODO replace outside spaces with \0 for transparent bg with solid fg
+			font[fontchar] = sprite
+		# }
+	# }
+	
+	return font
+# }
 
+def _join_multiline(joiner, args):
+	# this doesnt do any safety checking
+	return '\n'.join(map(str.join, joiner.split('\n'), zip(*[arg.split('\n') for arg in args])))
+# }
 
-
-
-
+def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
+	font = _cache.get(fontname, None)
+	if not font:
+		font = _load_aafont(fontname)
+		_cache[fontname] = font
+	# }
+	text = str(text)
+	nrows = len(font[' '].split('\n'))
+	joiner = _nullblock(charspace, nrows)
+	padfactor = { 'c' : 0.5, 'r' : 1.0 }.get(align, 0.0)
+	artsprites = [_join_multiline(joiner, [font.get(c, font.get(' ')) for c in line]) for line in text.split('\n')]
+	artwidths = [len(sprite.split('\n')[0]) for sprite in artsprites]
+	return ('\n' * (linespace + 1)).join([_join_multiline(_nullblock(0, nrows), (_nullblock(int(padfactor * (max(artwidths) - width)), nrows), sprite)) for sprite, width in itertools.izip(artsprites, artwidths)])
+# }
 
 
 
