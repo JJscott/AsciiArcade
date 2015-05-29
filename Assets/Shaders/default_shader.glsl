@@ -7,53 +7,29 @@
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
 
-
-
-
-
 #ifdef _VERTEX_
 
 layout(location = 0) in vec3 m_pos;
-layout(location = 1) in float m_radius;
+layout(location = 1) in vec3 m_norm;
+layout(location = 2) in vec3 m_uv;
 
 out VertexData
 {
 	vec3 pos;
-	float radius;
+	vec3 norm;
+	vec3 tex;
 } v_out;
 
 void main() {
-	v_out.pos = m_pos;
-	v_out.radius = m_radius;
+	vec4 pos = (projectionMatrix * modelViewMatrix * vec4(m_pos, 1.0));
+	vec4 norm = (projectionMatrix * modelViewMatrix * vec4(m_norm, 0.0));
+	gl_Position = pos;
+	v_out.pos = pos.xyz;
+	v_out.norm = norm.xyz;
+	v_out.tex = m_uv;
 }
 
 #endif
-
-
-
-
-
-
-#ifdef _GEOMETRY_
-
-layout(points) in;
-layout(triangle_strip, max_vertices = 20) out;
-
-in VertexData
-{
-	vec3 pos;
-	float norm;
-} v_in;
-
-
-
-
-
-#endif
-
-
-
-
 
 
 #ifdef _FRAGMENT_
@@ -69,7 +45,7 @@ out vec3 color;
 
 void main(){
 	vec3 grey = vec3(0.8, 0.8, 0.8);
-	color = grey * abs(v_in.norm.z);
+	color = grey * abs(normalize(v_in.norm).z);
 }
 
 #endif
