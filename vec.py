@@ -1,6 +1,7 @@
 
 
 from math import *
+import random
 
 class vec3(object):
 	"""docstring for vec3"""
@@ -18,6 +19,22 @@ class vec3(object):
 			return self[2]
 
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
+
+	@staticmethod
+	def i():
+		return vec3([1,0,0])
+
+	@staticmethod
+	def j():
+		return vec3([0,1,0])
+
+	@staticmethod
+	def k():
+		return vec3([0,0,1])
+
+	@staticmethod
+	def random():
+		return vec3([random.random()-0.5,random.random()-0.5,random.random()-0.5]).unit()
 
 	def add(self, v):
 		x, y, z = v;
@@ -108,17 +125,19 @@ class vec4(object):
 			return self[2]
 		if attr is 'w':
 			return self[3]
+		if attr is 'xyz':
+			return vec3((self[0], self[1], self[2]))
 
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
 
 
 	def add(self, v):
 		x, y, z, w = v;
-		return vec3((self[0] + x, self[1] + y, self[2] + z, self[3] + w))
+		return vec4((self[0] + x, self[1] + y, self[2] + z, self[3] + w))
 
 	def sub(self, v):
 		x, y, z, w = v;
-		return vec3((self[0] - x, self[1] - y, self[2] - z, self[3] - w))
+		return vec4((self[0] - x, self[1] - y, self[2] - z, self[3] - w))
 
 
 	def dot(self, v):
@@ -126,7 +145,7 @@ class vec4(object):
 		return self[0] * x + self[1] * y + self[2] * z + self[3] * w
 
 	def neg(self):
-		return vec3((-self[0], -self[1], -self[2], -self[3]))
+		return vec4((-self[0], -self[1], -self[2], -self[3]))
 
 	def unit(self):
 		return scale(self, 1.0/self.mag())
@@ -136,7 +155,10 @@ class vec4(object):
 		return sqrt(self[0]**2 + self[1]**2 + self[2]**2  + self[3]**2)
 
 	def scale(self, s):
-		return vec3((self[0] * s, self[1] * s, self[2] * s, self[3] * s))
+		return vec4((self[0] * s, self[1] * s, self[2] * s, self[3] * s))
+
+	def vec3(self, s):
+		return vec3((self[0], self[1], self[2]))
 
 
 	def __add__(self, r):
@@ -160,7 +182,7 @@ class vec4(object):
 		return iter(self._v)
 
 	def __getitem__(self, i):
-		return self[i]
+		return self._v[i]
 
 	def __str__(self):
 		return "(%s, %s, %s, %s)" % (_format_number(self._v[0]), _format_number(self._v[1]), _format_number(self._v[2]), _format_number(self._v[4]))
@@ -358,7 +380,8 @@ class mat4(object):
 		mpt[15] = mat4._det3x3(pt[0], pt[1], pt[2], pt[4], pt[5], pt[6], pt[8], pt[9], pt[10]) * invdet;
 		return mat4(mpt);
 
-
+	def transpose(self):
+		return mat4([e for row in zip(*self._v) for e in row])
 
 	"""m1 * m2 will call self.multiply_mat4(m2)"""
 	def __mul__(self, r):
@@ -370,11 +393,14 @@ class mat4(object):
 	def flatten(self):
 		return [e for row in self._v for e in row]
 
+	def row(self, i):
+		return list(self._v[i])
+
 	def __iter__(self):
 		return iter(self.flatten())
 
 	def __getitem__(self, i):
-		return self[(i%4 + i//4)]
+		return self._v[i//4][i%4]
 
 	def __str__(self):
 		"""'Pretty' formatting of the Mat4."""
@@ -414,6 +440,22 @@ class quat(object):
 		z = axis_u.z * sin_a
 		return quat([w, x, y, z])
 
+	def conjugate(self):
+		return quat(self[0], -self[1], -self[2], -self[3])
+
+	def norm(self):
+		return sqrt(self[0]**2 + self[1]**2 + self[2]**2)
+
+	def unit(self):
+		return quat(map(lambda x : x * self.norm(), self._v))
+
+	def multiply(self, q):
+		return quat([
+			self[0] * q[0] - self[1] * q[1] - self[2] * q[2] - self[3] * q[3],
+			self[0] * q[1] + self[1] * q[0] + self[2] * q[3] - self[3] * q[2],
+			self[0] * q[2] - self[1] * q[3] + self[2] * q[0] + self[3] * q[1],
+			self[0] * q[3] + self[1] * q[2] - self[2] * q[1] + self[3] * q[0] ])
+
 	def __getattr__(self, attr):
 		if attr is 'w':
 			return self[0]
@@ -425,6 +467,13 @@ class quat(object):
 			return self[3]
 
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
+
+	def __iter__(self):
+		return iter(self._v)
+
+	def __getitem__(self, i):
+		return self._v[i]
+
 
 
 class sphere(object):
@@ -469,10 +518,10 @@ class sphere(object):
 		return (self.center - s.center).mag() - (self.radius + s.radius)
 
 	def __str__(self):
-		return "("+self.center+", "+sphere.radius+")"
+		return "(" + str(self.center) + ", " + str(self.radius) + ")"
 
 	def __repr__(self):
-		return "sphere("+self.center+", r="+sphere.radius+")"
+		return "sphere(" + self.center + ", r=" + str(self.radius) + ")"
 
 
 def _format_number(n, accuracy=6):

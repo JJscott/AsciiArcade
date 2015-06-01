@@ -1,10 +1,9 @@
 /*
  *
- * Default shader program for writing to scene buffer using GL_TRIANGLES
+ * Shader program drawing red spheres
  *
  */
 
-uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
 
 #ifdef _VERTEX_
@@ -12,6 +11,8 @@ uniform mat4 projectionMatrix;
 layout(location = 0) in vec3 m_pos;
 layout(location = 1) in vec3 m_norm;
 layout(location = 2) in vec3 m_uv;
+
+layout(location = 3) in mat4 i_modelVeiwMatrix; // Instanced
 
 out VertexData
 {
@@ -21,8 +22,8 @@ out VertexData
 } v_out;
 
 void main() {
-	vec4 pos = (projectionMatrix * modelViewMatrix * vec4(m_pos, 1.0));
-	vec4 norm = (projectionMatrix * modelViewMatrix * vec4(m_norm, 0.0));
+	vec4 pos = (projectionMatrix * i_modelVeiwMatrix * vec4(m_pos, 1.0));
+	vec4 norm = (projectionMatrix * i_modelVeiwMatrix * vec4(m_norm, 0.0));
 	gl_Position = pos;
 	v_out.pos = pos.xyz;
 	v_out.norm = norm.xyz;
@@ -44,8 +45,8 @@ in VertexData
 out vec3 color;
 
 void main(){
-	vec3 grey = vec3(0.8, 0.8, 0.8);
-	color = grey * abs(v_in.norm.z);
+	vec3 red = vec3(1.0, 0.0, 0.0);
+	color = red * abs(normalize(v_in.norm.z));
 }
 
 #endif

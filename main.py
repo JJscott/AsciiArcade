@@ -34,7 +34,7 @@ def render_normal(w, h):
 	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	
 	# Clear the screen, and z-buffer
-	gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+	gl.glClearColor(0.0, 0.0, 0.0, 1.0)
 	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 	gl.glEnable(GL_DEPTH_TEST);
 	gl.glDepthFunc(GL_LESS);
@@ -57,13 +57,14 @@ render = render_normal
 def run():
 	width = 1280
 	height = 800
+	tick = 16		#milliseconds
 	
 	# Initilise pyGame and create window
 	# 
 	pygame.init()
 	clock = pygame.time.Clock()
 	screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
-	
+
 	global gl
 	gl = pygloo.init()
 
@@ -73,10 +74,11 @@ def run():
 	global asciirenderer
 	asciirenderer = ascii.AsciiRenderer(gl)
 	
+	old_time = clock.tick()
+
 	# Enter game loop
 	#
-	while True:
-		
+	while True:		
 		for event in pygame.event.get():
 			if event.type == QUIT:
 				return
@@ -93,11 +95,6 @@ def run():
 				# }
 			# }
 		# }
-
-		# Update the clock
-		# 
-		time_passed = clock.tick()
-		time_passed_seconds = time_passed / 1000.
 		
 		# Get key presses and update
 		# 
@@ -113,6 +110,14 @@ def run():
 		# Flip the double buffer
 		#
 		pygame.display.flip()
+
+
+		# Update the clock to keep constant time
+		# 
+		new_time = clock.tick()
+		if old_time + tick > new_time:
+			pygame.time.wait(new_time - (old_time + tick))
+		old_time = new_time
 	# }
 # }
 
