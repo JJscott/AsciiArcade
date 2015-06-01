@@ -490,7 +490,7 @@ out VertexData {
 
 void main() {
 	vec2 origin = pos.zw;
-	gl_Position = vec4(mod((pos.xy + 0.5) / vec2(viewport_size) + origin, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4(((pos.xy + 0.5) / vec2(viewport_size) + origin) * 2.0 - 1.0, 0.0, 1.0);
 	vertex_out.color = color;
 }
 
@@ -2581,8 +2581,8 @@ class AsciiRenderer:
 		art2 = wordart('ARCADE', 'big')
 		
 		# temp
-		#self.draw_text(0, 0, art1, color = (0, 0.9, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
-		#self.draw_text(0, 0, art2, color = (1, 0, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
+		self.draw_text(0, 0, art1, color = (0, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
+		self.draw_text(0, 0, art2, color = (1, 0, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
 		
 		if (w, h) == (0, 0): return
 		
