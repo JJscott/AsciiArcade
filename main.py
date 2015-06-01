@@ -55,8 +55,8 @@ render = render_normal
 
 
 def run():
-	width = 800
-	height = 600
+	width = 1280
+	height = 800
 	
 	# Initilise pyGame and create window
 	# 

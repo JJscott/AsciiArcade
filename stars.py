@@ -37,7 +37,7 @@ class StarsGame(object):
 		self.assets.load_geometry(gl, "asteroid3",	"Assets/Asteroids/AsteroidT3.obj")
 		self.assets.load_geometry(gl, "asteroid4",	"Assets/Asteroids/AsteroidT4.obj")
 		self.assets.load_geometry(gl, "asteroid5",	"Assets/Asteroids/AsteroidT5.obj")
-		self.assets.load_geometry(gl, "ship",		"Assets/Ship/ShipT.obj")
+		self.assets.load_geometry(gl, "ship",		"Assets/Ship/Ship2.obj")
 
 		# Load shader
 		# 

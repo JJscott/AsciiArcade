@@ -101,7 +101,43 @@ uniform mat4 proj_inv;
 // output is RGB-edge
 out vec4 frag_color;
 
+// frei-chen implementation from here
+// http://rastergrid.com/blog/2011/01/frei-chen-edge-detector/
+
+// frei-chen convolution kernels
+const mat3 freichen_kernel[9] = mat3[](
+	1.0/(2.0*sqrt(2.0)) * mat3( 1.0, sqrt(2.0), 1.0, 0.0, 0.0, 0.0, -1.0, -sqrt(2.0), -1.0 ),
+	1.0/(2.0*sqrt(2.0)) * mat3( 1.0, 0.0, -1.0, sqrt(2.0), 0.0, -sqrt(2.0), 1.0, 0.0, -1.0 ),
+	1.0/(2.0*sqrt(2.0)) * mat3( 0.0, -1.0, sqrt(2.0), 1.0, 0.0, -1.0, -sqrt(2.0), 1.0, 0.0 ),
+	1.0/(2.0*sqrt(2.0)) * mat3( sqrt(2.0), -1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, -sqrt(2.0) ),
+	1.0/2.0 * mat3( 0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0, 0.0 ),
+	1.0/2.0 * mat3( -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0 ),
+	1.0/6.0 * mat3( 1.0, -2.0, 1.0, -2.0, 4.0, -2.0, 1.0, -2.0, 1.0 ),
+	1.0/6.0 * mat3( -2.0, 1.0, -2.0, 1.0, 4.0, 1.0, -2.0, 1.0, -2.0 ),
+	1.0/3.0 * mat3( 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 )
+);
+
+// laplacian kernel
+const mat3 laplace_kernel = mat3(0.5, 1.0, 0.5, 1.0, -6.0, 1.0, 0.5, 1.0, 0.5) / 6.0;
+
 const vec2[] deltas = vec2[](vec2(1, 0), vec2(0, 1), vec2(-1, 0), vec2(0, -1));
+
+float convolve(mat3 a, mat3 b) {
+	return dot(a[0], b[0]) + dot(a[1], b[1]) + dot(a[2], b[2]);
+}
+
+float freichen_edge(mat3 img) {
+	float cnv[9];
+	// calculate the (squared) convolution values for all the masks
+	for (int i=0; i<9; i++) {
+		float dp3 = convolve(freichen_kernel[i], img);
+		cnv[i] = dp3 * dp3; 
+	}
+	// compare edge filter sum to total sum
+	float m = (cnv[0] + cnv[1]) + (cnv[2] + cnv[3]);
+	float s = (cnv[4] + cnv[5]) + (cnv[6] + cnv[7]) + (cnv[8] + m);
+	return sqrt(m / s);
+}
 
 float texture_depth(vec2 uv) {
 	float d0 = texture(sampler_depth, uv).r;
@@ -113,18 +149,116 @@ float texture_depth(vec2 uv) {
 
 void main() {
 	
-	bool edgy = false;
+	// local depth image
+	mat3 img_d;
 	
-	// edges from depth buffer
-	float depth = texture_depth(fullscreen_tex_coord);
-	float depth_l = -depth;
-	for (int i = 0; i < deltas.length(); i++) {
-		depth_l += 0.25 * texture_depth(fullscreen_tex_coord + deltas[i] / vec2(textureSize(sampler_color, 0)));
+	// sample 3x3 neighbourhood
+	for(int dx = -1; dx <= 1; ++dx) {
+		for(int dy = -1; dy <= 1; ++dy) {		
+			vec2 offset = vec2(dx, dy);
+			float depth = texture_depth(fullscreen_tex_coord + offset / vec2(textureSize(sampler_color, 0)));
+			img_d[dy + 1][dx + 1] = depth; //log(depth * 0.01 + 1.0) / log(1000 * 0.01 + 1.0);
+		}
 	}
-	edgy = edgy || abs(depth_l / depth) > 0.03;
+	
+	float lap_d = convolve(laplace_kernel, img_d);
+	
+	// look only at negative curvature - ignore 'inside' edges
+	// this gives cleaner lines for common cases
+	bool edgy = -lap_d / img_d[1][1] > 0.0005;
 	
 	// passthrough color, add edginess
 	frag_color = vec4(texture(sampler_color, fullscreen_tex_coord).rgb, mix(0.0, 1.0, edgy));
+}
+
+#endif
+'''
+
+_shader_edge_filter_source = _shader_fullscreen_source + '''
+
+// http://graphics.cs.williams.edu/papers/MedianShaderX6/median.pix
+
+/*
+3x3 Median
+Morgan McGuire and Kyle Whitson
+http://graphics.cs.williams.edu
+
+
+Copyright (c) Morgan McGuire and Williams College, 2006
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+// RGB-edge
+uniform sampler2D sampler_color;
+
+#ifdef _FRAGMENT_
+
+#define s2(a, b)				temp = a; a = min(a, b); b = max(temp, b);
+#define mn3(a, b, c)			s2(a, b); s2(a, c);
+#define mx3(a, b, c)			s2(b, c); s2(a, c);
+
+#define mnmx3(a, b, c)			mx3(a, b, c); s2(a, b);                                   // 3 exchanges
+#define mnmx4(a, b, c, d)		s2(a, b); s2(c, d); s2(a, c); s2(b, d);                   // 4 exchanges
+#define mnmx5(a, b, c, d, e)	s2(a, b); s2(c, d); mn3(a, c, e); mx3(b, d, e);           // 6 exchanges
+#define mnmx6(a, b, c, d, e, f) s2(a, d); s2(b, e); s2(c, f); mn3(a, b, c); mx3(d, e, f); // 7 exchanges
+
+// Starting with a subset of size 6, remove the min and max each time
+#define sort9_ \
+mnmx6(v[0], v[1], v[2], v[3], v[4], v[5]); \
+mnmx5(v[1], v[2], v[3], v[4], v[6]); \
+mnmx4(v[2], v[3], v[4], v[7]); \
+mnmx3(v[3], v[4], v[8]); \
+
+void sort9(inout float v[9]) {
+	float temp;
+	sort9_;
+}
+
+out vec4 frag_color;
+
+void main() {
+	
+	float edges[9];
+	
+	// Add the pixels which make up our window to the pixel array.
+	for(int dX = -1; dX <= 1; ++dX) {
+		for(int dY = -1; dY <= 1; ++dY) {		
+			vec2 offset = vec2(float(dX), float(dY));
+			// If a pixel in the window is located at (x+dX, y+dY), put it at index (dX + R)(2R + 1) + (dY + R) of the
+			// pixel array. This will fill the pixel array, with the top left pixel of the window at pixel[0] and the
+			// bottom right pixel of the window at pixel[N-1].
+			edges[(dX + 1) * 3 + (dY + 1)] = texture(sampler_color, fullscreen_tex_coord + offset / vec2(textureSize(sampler_color, 0))).a;
+		}
+	}
+	
+	// sort edge flags -> get median
+	sort9(edges);
+	
+	// passthrough color
+	frag_color = vec4(texture(sampler_color, fullscreen_tex_coord).rgb, edges[4]);
 }
 
 #endif
@@ -249,8 +383,8 @@ void main() {
 	// manual grad to avoid discontinuities
 	float f = textureGrad(sampler_font, vec3(uv * char_uvlim, codepoint), dFdx(fsuv * char_uvlim), dFdy(fsuv * char_uvlim)).r;
 	// use font texture to interpolate between bg and fg
-	frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
-	//frag_color = vec4(vec3(texture(sampler_color, fullscreen_tex_coord).a), 1.0);
+	//frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
+	frag_color = vec4(vec3(texture(sampler_color, fullscreen_tex_coord).a), 1.0);
 }
 
 #endif
@@ -267,7 +401,7 @@ class AsciiRenderer:
 		self._img_size = (1, 1)
 		
 		# text screen buffer (w, h)
-		self._text_size = (0, 80)
+		self._text_size = (0, 100)
 		
 		# colors
 		self.fgcolor = (1, 1, 1)
@@ -326,21 +460,32 @@ class AsciiRenderer:
 		
 		# edge detection FBO
 		self._fbo_edge = GLuint(0)
-		self._tex_edge = GLuint(0)
+		self._tex_edge0 = GLuint(0)
+		self._tex_edge1 = GLuint(0)
 		
 		gl.glGenFramebuffers(1, self._fbo_edge)
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_edge)
 		
-		gl.glGenTextures(1, self._tex_edge)
+		gl.glGenTextures(1, self._tex_edge0)
+		gl.glGenTextures(1, self._tex_edge1)
 		
 		# edge texture - RGB-EDGE
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge0)
 		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
 		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_FLOAT, None)
-		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_edge, 0)
+		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self._tex_edge0, 0)
+		
+		# second edge texture - RGB-EDGE
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge1)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_FLOAT, None)
+		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, self._tex_edge1, 0)
 		
 		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
 		
@@ -478,7 +623,11 @@ class AsciiRenderer:
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, self._img_size[0], self._img_size[1], 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
 		
 		# edge texture
-		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge0)
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, self._img_size[0], self._img_size[1], 0, GL_RGBA, GL_FLOAT, None)
+		
+		# second edge texture
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge1)
 		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, self._img_size[0], self._img_size[1], 0, GL_RGBA, GL_FLOAT, None)
 		
 		# RGB-ASCII texture
@@ -636,20 +785,40 @@ class AsciiRenderer:
 			_cache['prog_edge'] = prog_edge
 		# }
 		
+		prog_edge_filter = _cache.get('prog_edge_filter', None)
+		if not prog_edge_filter:
+			prog_edge_filter = makeProgram(gl, '330 core', (GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER), _shader_edge_filter_source)
+			_cache['prog_edge_filter'] = prog_edge_filter
+		# }
+		
 		gl.glActiveTexture(GL_TEXTURE0)
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_color)
 		gl.glActiveTexture(GL_TEXTURE1)
 		gl.glBindTexture(GL_TEXTURE_2D, self._tex_depth)
+		gl.glActiveTexture(GL_TEXTURE2)
+		gl.glBindTexture(GL_TEXTURE_2D, self._tex_edge0)
 		
 		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, self._fbo_edge)
 		gl.glViewport(0, 0, *self._img_size)
 		
+		# initial edge detection
+		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
 		gl.glUseProgram(prog_edge)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_color'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_depth'), 1)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog_edge, 'proj_inv'), 1, True, c_array(GLfloat, proj.inverse().flatten()))
 		
 		self._draw_dummy()
+		
+		# filtering
+		gl.glDrawBuffer(GL_COLOR_ATTACHMENT1)
+		gl.glUseProgram(prog_edge_filter)
+		gl.glUniform1i(gl.glGetUniformLocation(prog_edge_filter, 'sampler_color'), 2)
+		
+		#self._draw_dummy()
+		
+		# specify the output texture
+		self._tex_edge = self._tex_edge0
 		
 		# ASCII conversion
 		# output texture is (new) color + ascii code
