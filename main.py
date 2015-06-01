@@ -55,7 +55,7 @@ render = render_normal
 
 
 def run():
-	width = 1280
+	width = 1278
 	height = 800
 	tick = 16		#milliseconds
 	
