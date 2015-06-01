@@ -163,9 +163,9 @@ void main() {
 	
 	float lap_d = convolve(laplace_kernel, img_d);
 	
-	// look only at negative curvature - ignore 'inside' edges
+	// look only at positive curvature ???
 	// this gives cleaner lines for common cases
-	bool edgy = -lap_d / img_d[1][1] > 0.0005;
+	bool edgy = lap_d / img_d[1][1] > 0.0005;
 	
 	// passthrough color, add edginess
 	frag_color = vec4(texture(sampler_color, fullscreen_tex_coord).rgb, mix(0.0, 1.0, edgy));
