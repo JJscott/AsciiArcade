@@ -2581,8 +2581,8 @@ class AsciiRenderer:
 		art2 = wordart('ARCADE', 'big')
 		
 		# temp
-		self.draw_text(0, 0, art1, color = (0, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
-		self.draw_text(0, 0, art2, color = (1, 0, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
+		self.draw_text(0, 0, art1, color = (0.333, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
+		self.draw_text(0, 0, art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
 		
 		if (w, h) == (0, 0): return
 		
@@ -2772,7 +2772,9 @@ def _floodfill_bg(text, o, r):
 	return '\n'.join(imap(str.join, repeat(''), [[lines, list(imap(lambda points, visited, sentinel: [None if p in visited else [visited.add(p), [lines[p[1]].__setitem__(p[0], r), points.extend([(p[0] + dx, p[1] + dy) for dx, dy in [(1,0),(0,1),(-1,0),(0,-1)]]), sentinel.__setitem__(0, len(points))] if lines[p[1]][p[0]] == o else None] for p in [(p0[0] % len(lines[0]), p0[1] % len(lines)) for p0 in [[points.pop(), sentinel.__setitem__(0, len(points))][0]]]], repeat(list(chain(izip(repeat(0), xrange(len(lines))), izip(repeat(len(lines[0])-1), xrange(len(lines))), izip(xrange(len(lines[0])), repeat(0)), izip(xrange(len(lines[0])), repeat(len(lines)-1))))), repeat(set()), iter(lambda x=[1]: x, [0])))][0] for lines in (map(list, text.split('\n')),)][0]))
 # }
 
-def _load_aafont(fontname):
+def _load_aafont(fontname, _cache = {}):
+	font = _cache.get(fontname, None)
+	if font is not None: return font
 	from itertools import izip, imap, chain, repeat, takewhile
 	font = {}
 	with open('./res/{0}.aafont'.format(fontname)) as file:
@@ -2789,21 +2791,18 @@ def _load_aafont(fontname):
 			font[fontchar] = sprite
 		# }
 	# }
-	
+	_cache[fontname] = font
 	return font
 # }
 
 def _join_multiline(joiner, args):
-	# this doesnt do any safety checking
+	# this doesnt do <s>any</s> much safety checking
+	if len(args) == 0: return _nullblock(0, len(joiner.split('\n')))
 	return '\n'.join(map(str.join, joiner.split('\n'), zip(*[arg.split('\n') for arg in args])))
 # }
 
 def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
-	font = _cache.get(fontname, None)
-	if not font:
-		font = _load_aafont(fontname)
-		_cache[fontname] = font
-	# }
+	font = _load_aafont(fontname)
 	text = str(text)
 	nrows = len(font[' '].split('\n'))
 	joiner = _nullblock(charspace, nrows)
@@ -2813,7 +2812,14 @@ def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = 
 	return ('\n' * (linespace + 1)).join([_join_multiline(_nullblock(0, nrows), (_nullblock(int(padfactor * (max(artwidths) - width)), nrows), sprite)) for sprite, width in itertools.izip(artsprites, artwidths)])
 # }
 
-
+def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
+	font = _load_aafont(fontname)
+	text = str(text)
+	nrows = len(font[' '].split('\n'))
+	lines = text.split('\n')
+	linewidths = [reduce(int.__add__, [len(font.get(c, font.get(' ')).split('\n')[0]) for c in line] + [max(0, (len(line) - 1) * charspace)]) for line in lines]
+	return (max(linewidths), len(lines) * nrows + max(0, (len(lines) - 1) * linespace))
+# }
 
 
 
