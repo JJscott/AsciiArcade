@@ -2809,7 +2809,8 @@ def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = 
 	padfactor = { 'c' : 0.5, 'r' : 1.0 }.get(align, 0.0)
 	artsprites = [_join_multiline(joiner, [font.get(c, font.get(' ')) for c in line]) for line in text.split('\n')]
 	artwidths = [len(sprite.split('\n')[0]) for sprite in artsprites]
-	return ('\n' * (linespace + 1)).join([_join_multiline(_nullblock(0, nrows), (_nullblock(int(padfactor * (max(artwidths) - width)), nrows), sprite)) for sprite, width in itertools.izip(artsprites, artwidths)])
+	maxwidth = max(artwidths)
+	return '\n'.join(line.ljust(maxwidth, '\0') for line in ('\n' * (linespace + 1)).join(_join_multiline(_nullblock(0, nrows), [_nullblock(int(padfactor * (maxwidth - width)), nrows), sprite]) for sprite, width in itertools.izip(artsprites, artwidths)).split('\n'))
 # }
 
 def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
