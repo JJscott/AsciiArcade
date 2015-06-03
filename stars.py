@@ -19,6 +19,7 @@ from pygame.locals import *
 # Other stuff
 # 
 from GL_assets import *
+from collections import defaultdict
 
 
 
@@ -32,18 +33,18 @@ class StarsGame(object):
 		# Load geometry
 		# 
 		self.assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
-		self.assets.load_geometry(gl, 		"asteroid1",	"Assets/Asteroids/AsteroidT1.obj", center=True)
-		self.assets.load_geometry(gl, 		"asteroid2",	"Assets/Asteroids/AsteroidT2.obj", center=True)
-		self.assets.load_geometry(gl, 		"asteroid3",	"Assets/Asteroids/AsteroidT3.obj", center=True)
-		self.assets.load_geometry(gl, 		"asteroid4",	"Assets/Asteroids/AsteroidT4.obj", center=True)
-		self.assets.load_geometry(gl, 		"asteroid5",	"Assets/Asteroids/AsteroidT5.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/AsteroidT1.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/AsteroidT2.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/AsteroidT3.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/AsteroidT4.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/AsteroidT5.obj", center=True)
 		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/ShipT.obj")
 		self.assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
 
 		# Load shader
 		# 
-		self.assets.load_shader(gl, "bullet",	open("Assets/Shaders/default_shader.glsl").read())
-		self.assets.load_shader(gl, "asteroid",	open("Assets/Shaders/default_shader.glsl").read())
+		self.assets.load_shader(gl, "bullet",	open("Assets/Shaders/bullet_shader.glsl").read())
+		self.assets.load_shader(gl, "asteroid",	open("Assets/Shaders/asteroid_shader.glsl").read())
 		self.assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
 		self.assets.load_shader(gl, "sphere",	open("Assets/Shaders/red_sphere_shader.glsl").read())
 
@@ -56,7 +57,7 @@ class StarsGame(object):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["ship"] = Ship()
-		self.scene["asteroid_field"] = AsteroidField((5,5))
+		self.scene["asteroid_field"] = AsteroidField(self.assets, (5,5))
 	
 
 	# Game logic
@@ -85,13 +86,13 @@ class StarsGame(object):
 	# Render logic
 	#
 	def render(self, gl, w, h):
-		zfar = 10000
+		zfar = 1000
 		znear = 0.1
 
 		# Create view and projection matrix
 		#
 		proj = mat4.perspectiveProjection(math.pi / 3, float(w)/h, znear, zfar)
-		view = self.scene["ship"].get_view_matrix().inverse()
+		view = self.scene["ship"].get_view_matrix()
 
 		# Render all objects in the scene
 		# 
@@ -131,6 +132,7 @@ class StarsGame(object):
 					position = mat4.translate(s.center.x, s.center.y, s.center.z)
 					mv = (view * position * scale).transpose()
 					mv_array.extend(mv.flatten())
+
 				mv_c_array = pygloo.c_array(GLfloat, mv_array)
 				gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
 				gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
@@ -197,7 +199,7 @@ class BulletCollection(object):
 			# Set up matricies
 			#
 			position = mat4.translate(b.position.x, b.position.y, b.position.z)
-			mv = view * position * model
+			mv = (view * position * model).transpose()
 			mv_array.extend(mv.flatten())
 
 		mv_c_array = pygloo.c_array(GLfloat, mv_array)
@@ -268,7 +270,7 @@ class Ship(object):
 		ship_pos = vec3([self.position.x * 0.9, self.position.y * 0.9, self.position.z])
 		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
 			mat4.rotateX(cam_Xrot) *
-			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z))
+			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z)).inverse()
 
 	def get_sphere_list(self):
 		all_spheres = [sphere(self.position + vec3([0, 0, -1.0]), 0.5)]
@@ -363,8 +365,12 @@ class Ship(object):
 		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
 
 
-		# TODO render firing target
-		# 
+
+
+
+
+
+
 
 
 
@@ -375,15 +381,16 @@ class Ship(object):
 class AsteroidField(object):
 
 	"""docstring for AsteroidField"""
-	def __init__(self, (xbound, ybound) ):
+	def __init__(self, assets, (xbound, ybound) ):
 		super(AsteroidField, self).__init__()
 		self.asteroid_list = []
 		for _ in range(50):
 			pos = vec3(((random() - 0.5) * 2 * xbound, (random() - 0.5) * 2 * ybound, randrange(-1000, -5)))
 			v = vec3.random() * random() * 0.01
 			r = vec3.random() * math.pi * random() * 0.01
+			m = randrange(1, 6)
 
-			self.asteroid_list.append(Asteroid(pos, vel=v, rot=r) )
+			self.asteroid_list.append(Asteroid(pos, ast_num=m, vel=v, rot=r) )
 			
 	def update(self, scene, pressed):
 		for a in self.asteroid_list:
@@ -391,9 +398,55 @@ class AsteroidField(object):
 	
 
 	def draw(self, gl, assets, proj, view):
-		for a in self.asteroid_list:
-			a.draw(gl, assets, proj, view)
-	
+		# draw_list = defaultdict(lambda: [], {})
+		# for a in self.asteroid_list:
+		# 	draw_list[a.ast_num].append(a)
+		# 	a.draw(gl, assets, proj, view)
+
+
+		prog = assets.get_shader(tag="asteroid")
+		gl.glUseProgram(prog)
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+
+		model = mat4.scale(2,2,2)
+
+		for i in xrange(1, 6):
+
+			# Retreive model and shader, Load geometry once
+			#
+			vao, vao_size = assets.get_geometry(tag="asteroid{num}".format(num=i))
+			inst_vbo = assets.get_inst_vbo(tag="asteroid{num}".format(num=i))
+			gl.glBindVertexArray(vao)
+
+			# Create buffer
+			# 
+			mv_array = []
+
+
+			# Create the instance data
+			# 
+			count = 0
+			for a in [a for a in self.asteroid_list if a.ast_num == i]:
+
+				# Set up matricies
+				#
+				rotation = mat4.rotateFromQuat(a.orientation)
+				position = mat4.translate(a.position.x, a.position.y, a.position.z)
+				mv = (view * position * rotation * model).transpose()
+				mv_array.extend(mv.flatten())
+				count += 1
+
+
+			# Upload the instace data
+			# 
+			mv_c_array = pygloo.c_array(GLfloat, mv_array)
+			gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
+			gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
+
+			# Render
+			# 	
+			gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, count)
 
 
 	def get_sphere_list(self):
@@ -403,15 +456,13 @@ class AsteroidField(object):
 
 class Asteroid(object):
 	"""docstring for Asteroid"""
-	def __init__(self, pos, vel=(0,0,0), rot=(0,0,0)):
+	def __init__(self, pos, ast_num=1, vel=(0,0,0), rot=(0,0,0)):
 		super(Asteroid, self).__init__()
 		self.position = vec3(pos) 
 		self.velocity = vec3(vel)
 		self.rotation = vec3(rot)
 		self.orientation = quat.axisangle(vec3.random(), 2 * math.pi * random()).unit()
-
-		self.vao = GLuint(0)
-		self.vao_size = 0
+		self.ast_num = ast_num
 
 		self.sph = sphere([0,0,0],0)
 	
@@ -419,31 +470,31 @@ class Asteroid(object):
 		self.position = self.position + self.velocity
 		self.orientation = self.orientation.multiply(quat.axisangle(self.rotation, self.rotation.mag()).unit())
 	
-	def draw(self, gl, assets, proj, view):
-		# HACK
-		# 
-		self.sph = assets.get_geometry_sphere(tag="asteroid1")
+	# def draw(self, gl, assets, proj, view):
+	# 	# HACK to get sphere
+	# 	# 
+	# 	self.sph = assets.get_geometry_sphere(tag="asteroid1")
 
-		# Set up matricies
-		#
-		model = mat4.scale(2,2,2) * mat4.rotateFromQuat(self.orientation)
-		position = mat4.translate(self.position.x, self.position.y, self.position.z)
-		mv = view * position * model
+	# 	# Set up matricies
+	# 	#
+	# 	model = mat4.scale(2,2,2) * mat4.rotateFromQuat(self.orientation)
+	# 	position = mat4.translate(self.position.x, self.position.y, self.position.z)
+	# 	mv = view * position * model
 
-		# Retreive model and shader
-		#
-		vao, vao_size = assets.get_geometry(tag="asteroid1")
-		prog = assets.get_shader(tag="asteroid")
+	# 	# Retreive model and shader
+	# 	#
+	# 	vao, vao_size = assets.get_geometry(tag="asteroid1")
+	# 	prog = assets.get_shader(tag="asteroid")
 
-		# Render
-		# 
-		gl.glUseProgram(prog)
-		gl.glBindVertexArray(vao)
+	# 	# Render
+	# 	# 
+	# 	gl.glUseProgram(prog)
+	# 	gl.glBindVertexArray(vao)
 
-		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
-		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+	# 	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+	# 	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
-		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+	# 	gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
 
 
 	def get_sphere(self):
