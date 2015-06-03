@@ -2393,7 +2393,7 @@ class AsciiRenderer:
 		gl.glDrawBuffer(GL_COLOR_ATTACHMENT0)
 		
 		# load font atlas
-		fontimg = pygame.image.load('./res/font.png')
+		fontimg = pygame.image.load('./res/font.bmp')
 		tex_font_atlas = GLuint(0)
 		gl.glGenTextures(1, tex_font_atlas)
 		
