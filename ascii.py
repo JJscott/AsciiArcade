@@ -4,6 +4,7 @@ from __future__ import division
 import pygame
 import ctypes
 import itertools
+import math
 from pygloo import *
 from simpleShader import makeProgram
 
@@ -490,7 +491,7 @@ out VertexData {
 
 void main() {
 	vec2 origin = pos.zw;
-	gl_Position = vec4(mod((pos.xy + 0.5) / vec2(viewport_size) + origin, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4(((pos.xy + 0.5) / vec2(viewport_size) + origin) * 2.0 - 1.0, 0.0, 1.0);
 	vertex_out.color = color;
 }
 
@@ -2581,8 +2582,8 @@ class AsciiRenderer:
 		art2 = wordart('ARCADE', 'big')
 		
 		# temp
-		#self.draw_text(0, 0, art1, color = (0, 0.9, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
-		#self.draw_text(0, 0, art2, color = (1, 0, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
+		self.draw_text(art1, color = (0.333, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
+		self.draw_text(art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
 		
 		if (w, h) == (0, 0): return
 		
@@ -2712,12 +2713,12 @@ class AsciiRenderer:
 		gl.glUseProgram(0)
 	# }
 	
-	def draw_text(self, x, y, text, chardelta = (1, 0), linedelta = (0, -1), align = 'l', textorigin = (0, 0), screenorigin = (0, 0), color = None):
+	def draw_text(self, text, pos = (0,0), chardelta = (1, 0), linedelta = (0, -1), align = 'l', textorigin = (0, 0), screenorigin = (0, 0), color = None):
 		'''
 		Draw some (coloured) text. Align text region origin with screen origin, then offset text position by x,y
 		
 		Parameters:
-			x, y           Offset from aligned origins, in characters
+			pos            Offset from aligned origins (x,y), in characters
 			text           Text to draw (str)
 			chardelta      Position delta between characters within a line of text (units are characters); default is (1,0)
 			linedelta      Position delta between lines of text (units are characters); default is (0,-1)
@@ -2742,6 +2743,8 @@ class AsciiRenderer:
 		padsizes = [padfactor * (tw - len(line)) for line in lines]
 		# text origin
 		# TODO test / check this properly
+		x = pos[0]
+		y = pos[1]
 		x -= tw * textorigin[0] * chardelta[0] + th * textorigin[1] * linedelta[0]
 		y -= th * textorigin[1] * linedelta[1] + tw * textorigin[0] * chardelta[1]
 		# process lines...
@@ -2772,7 +2775,9 @@ def _floodfill_bg(text, o, r):
 	return '\n'.join(imap(str.join, repeat(''), [[lines, list(imap(lambda points, visited, sentinel: [None if p in visited else [visited.add(p), [lines[p[1]].__setitem__(p[0], r), points.extend([(p[0] + dx, p[1] + dy) for dx, dy in [(1,0),(0,1),(-1,0),(0,-1)]]), sentinel.__setitem__(0, len(points))] if lines[p[1]][p[0]] == o else None] for p in [(p0[0] % len(lines[0]), p0[1] % len(lines)) for p0 in [[points.pop(), sentinel.__setitem__(0, len(points))][0]]]], repeat(list(chain(izip(repeat(0), xrange(len(lines))), izip(repeat(len(lines[0])-1), xrange(len(lines))), izip(xrange(len(lines[0])), repeat(0)), izip(xrange(len(lines[0])), repeat(len(lines)-1))))), repeat(set()), iter(lambda x=[1]: x, [0])))][0] for lines in (map(list, text.split('\n')),)][0]))
 # }
 
-def _load_aafont(fontname):
+def _load_aafont(fontname, _cache = {}):
+	font = _cache.get(fontname, None)
+	if font is not None: return font
 	from itertools import izip, imap, chain, repeat, takewhile
 	font = {}
 	with open('./res/{0}.aafont'.format(fontname)) as file:
@@ -2789,35 +2794,119 @@ def _load_aafont(fontname):
 			font[fontchar] = sprite
 		# }
 	# }
-	
+	_cache[fontname] = font
 	return font
 # }
 
 def _join_multiline(joiner, args):
-	# this doesnt do any safety checking
+	# this doesnt do <s>any</s> much safety checking
+	if len(args) == 0: return _nullblock(0, len(joiner.split('\n')))
 	return '\n'.join(map(str.join, joiner.split('\n'), zip(*[arg.split('\n') for arg in args])))
 # }
 
 def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
-	font = _cache.get(fontname, None)
-	if not font:
-		font = _load_aafont(fontname)
-		_cache[fontname] = font
-	# }
+	font = _load_aafont(fontname)
 	text = str(text)
 	nrows = len(font[' '].split('\n'))
 	joiner = _nullblock(charspace, nrows)
 	padfactor = { 'c' : 0.5, 'r' : 1.0 }.get(align, 0.0)
 	artsprites = [_join_multiline(joiner, [font.get(c, font.get(' ')) for c in line]) for line in text.split('\n')]
 	artwidths = [len(sprite.split('\n')[0]) for sprite in artsprites]
-	return ('\n' * (linespace + 1)).join([_join_multiline(_nullblock(0, nrows), (_nullblock(int(padfactor * (max(artwidths) - width)), nrows), sprite)) for sprite, width in itertools.izip(artsprites, artwidths)])
+	maxwidth = max(artwidths)
+	return '\n'.join(line.ljust(maxwidth, '\0') for line in ('\n' * (linespace + 1)).join(_join_multiline(_nullblock(0, nrows), [_nullblock(int(padfactor * (maxwidth - width)), nrows), sprite]) for sprite, width in itertools.izip(artsprites, artwidths)).split('\n'))
 # }
 
+def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
+	font = _load_aafont(fontname)
+	text = str(text)
+	nrows = len(font[' '].split('\n'))
+	lines = text.split('\n')
+	linewidths = [reduce(int.__add__, [len(font.get(c, font.get(' ')).split('\n')[0]) for c in line] + [max(0, (len(line) - 1) * charspace)]) for line in lines]
+	return (max(linewidths), len(lines) * nrows + max(0, (len(lines) - 1) * linespace))
+# }
 
+def size(text):
+	lines = [] if text is None else str(text).split('\n')
+	tw = max(map(len, lines) + [0])
+	th = len(lines)
+	return (tw, th)
+# }
 
+def border(text = None, left = 0, right = 0, top = 0, bottom = 0, fillchar = '\0'):
+	lines = [] if text is None else str(text).split('\n')
+	tw = max(map(len, lines) + [0])
+	lines = [''] * top + lines + [''] * bottom
+	lineformat = '{0}{{0}}{1}'.format(fillchar * left, fillchar * right)
+	return '\n'.join(lineformat.format(line.ljust(tw, fillchar)) for line in lines)
+# }
 
+def fill(size = (0,0), fillchar = '\0'):
+	return '\n'.join([fillchar * size[0]] * size[1])
+# }
 
+def composite(fgtext, bgtext, pos = (0,0), fgorigin = (0,0), bgorigin = (0,0), modular = False):
+	# this function is really useful
+	from itertools import imap, izip, chain, repeat
+	bgorigin = tuple(bgorigin)[:2]
+	fgorigin = tuple(fgorigin)[:2]
+	bglines = [] if bgtext is None else str(bgtext).split('\n')
+	fglines = [] if fgtext is None else str(fgtext).split('\n')
+	bgw = max(map(len, bglines) + [0])
+	bgh = len(bglines)
+	fgw = max(map(len, fglines) + [0])
+	fgh = len(fglines)
+	# empty string has size (0,1), so we use None for size (0,0)
+	if bgh == 0: return None
+	# ensure lines are proper lengths
+	bglines = [line.ljust(bgw, '\0') for line in bglines]
+	fglines = [line.ljust(fgw, '\0') for line in fglines]
+	# fg-bg offset for bottom-left (input coords are positive right-up)
+	fgx = int(math.floor(bgw * bgorigin[0] - fgw * fgorigin[0] + pos[0]))
+	fgy = int(math.floor(bgh * bgorigin[1] - fgh * fgorigin[1] + pos[1]))
+	# change to top-left offset (text coords are positive right-down)
+	fgy = bgh - fgy - fgh
+	# composite lines
+	fgget = lambda x, y: fglines[(y - fgy) % fgh][(x - fgx) % fgw] if modular or (x >= fgx and y >= fgy and x < fgx + fgw and y < fgy + fgh) else '\0'
+	return '\n'.join(''.join(lineit) for lineit in imap(lambda bgline, points: imap(lambda bg, p: chr(ord(fgget(*p)) or ord(bg)), bgline, points), bglines, (izip(xrange(bgw), repeat(y)) for y in xrange(bgh))))
+# }
 
+def cut(text = '', pos = (0,0), size = (0,0), fgorigin = (0,0), bgorigin = (0,0), modular = False, fillchar = '\0'):
+	# convenience? complement of composite, kinda
+	return composite(text, fill(size, fillchar), pos=[-x for x in pos], fgorigin=bgorigin, bgorigin=fgorigin, modular=modular)
+# }
+
+def box(text = None, size = (0,0), fillchar = '\0', toppat = '+-+', bottompat = '+-+', leftpat = '|', rightpat = '|'):
+	from itertools import islice, chain, repeat
+	lines = [] if text is None else str(text).split('\n')
+	tw = max(max(map(len, lines) + [0]), size[0])
+	th = max(len(lines), size[1])
+	lines.extend([fillchar * tw] * (th - len(lines)))
+	topline = '{0}{1}{2}'.format(toppat[0], ''.join(islice(chain.from_iterable(repeat(toppat[1:-1])), tw)), toppat[-1])
+	bottomline = '{0}{1}{2}'.format(bottompat[0], ''.join(islice(chain.from_iterable(repeat(bottompat[1:-1])), tw)), bottompat[-1])
+	return '\n'.join([topline] + ['{0}{1}{2}'.format(leftpat[y % len(leftpat)], line.ljust(tw, fillchar), rightpat[y % len(rightpat)]) for y, line in enumerate(lines)] + [bottomline])
+# }
+
+class TextArea(object):
+	
+	def __init__(fontname, size):
+		self.fontname = fontname
+		self.size = size
+		self.text = ''
+		self.cursor = 0
+	# }
+	
+	def insert(self, text):
+		''' Insert text at cursor. '''
+		i = min(max(self.cursor, 0), len(self.text))
+		self.text = self.text[:i] + text + self.text[i:]
+	# }
+	
+	def __str__(self):
+		# TODO
+		pass
+	# }
+	
+# }
 
 
 
