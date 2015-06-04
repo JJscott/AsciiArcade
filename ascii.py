@@ -2769,7 +2769,7 @@ def _nullblock(w, h):
 	return '\n'.join(('\0' * w,) * h)
 # }
 
-def _floodfill_bg(text, o, r):
+def cookie(text, o = ' ', r = '\0'):
 	from itertools import izip, imap, repeat, chain
 	# i think this actually works...
 	return '\n'.join(imap(str.join, repeat(''), [[lines, list(imap(lambda points, visited, sentinel: [None if p in visited else [visited.add(p), [lines[p[1]].__setitem__(p[0], r), points.extend([(p[0] + dx, p[1] + dy) for dx, dy in [(1,0),(0,1),(-1,0),(0,-1)]]), sentinel.__setitem__(0, len(points))] if lines[p[1]][p[0]] == o else None] for p in [(p0[0] % len(lines[0]), p0[1] % len(lines)) for p0 in [[points.pop(), sentinel.__setitem__(0, len(points))][0]]]], repeat(list(chain(izip(repeat(0), xrange(len(lines))), izip(repeat(len(lines[0])-1), xrange(len(lines))), izip(xrange(len(lines[0])), repeat(0)), izip(xrange(len(lines[0])), repeat(len(lines)-1))))), repeat(set()), iter(lambda x=[1]: x, [0])))][0] for lines in (map(list, text.split('\n')),)][0]))
@@ -2790,7 +2790,7 @@ def _load_aafont(fontname, _cache = {}):
 			endcol = max(len(line) - len(list(takewhile(str.isspace, reversed(line)))) for line in sprite)
 			sprite = '\n'.join([str.ljust(line, endcol)[begcol:endcol] for line in sprite])
 			# replace outside spaces with \0 for transparent bg with solid fg
-			sprite = _floodfill_bg(sprite, ' ', '\0')
+			sprite = cookie(sprite)
 			font[fontchar] = sprite
 		# }
 	# }
@@ -2804,7 +2804,14 @@ def _join_multiline(joiner, args):
 	return '\n'.join(map(str.join, joiner.split('\n'), zip(*[arg.split('\n') for arg in args])))
 # }
 
-def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
+def size(text):
+	lines = [] if text is None else str(text).split('\n')
+	tw = max(map(len, lines) + [0])
+	th = len(lines)
+	return (tw, th)
+# }
+
+def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l'):
 	font = _load_aafont(fontname)
 	text = str(text)
 	nrows = len(font[' '].split('\n'))
@@ -2816,7 +2823,7 @@ def wordart(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = 
 	return '\n'.join(line.ljust(maxwidth, '\0') for line in ('\n' * (linespace + 1)).join(_join_multiline(_nullblock(0, nrows), [_nullblock(int(padfactor * (maxwidth - width)), nrows), sprite]) for sprite, width in itertools.izip(artsprites, artwidths)).split('\n'))
 # }
 
-def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l', _cache = {}):
+def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l'):
 	font = _load_aafont(fontname)
 	text = str(text)
 	nrows = len(font[' '].split('\n'))
@@ -2825,11 +2832,57 @@ def wordart_size(text, fontname, charspace = 0, linespace = 0, align = 'l', _cac
 	return (max(linewidths), len(lines) * nrows + max(0, (len(lines) - 1) * linespace))
 # }
 
-def size(text):
-	lines = [] if text is None else str(text).split('\n')
-	tw = max(map(len, lines) + [0])
-	th = len(lines)
-	return (tw, th)
+def wordwrap(text, width, fontname):
+	import re
+	lines = []
+	line = ''
+	for word, space in ((m.group(1), m.group(2)) for m in re.finditer(r'(?!$)(\S*)(\s*)', text)):
+		# append word or newline
+		line2 = line + word
+		if wordart_size(line2, fontname)[0] <= width:
+			# fits, append
+			line = line2
+			#print 'line:', line
+		else:
+			# doesnt fit, newline
+			lines.append(line)
+			#print 'newline' 
+			if wordart_size(word, fontname)[0] <= width:
+				line = word
+				#print 'line:', line
+			else:
+				# word doesnt fit in one line, have to split
+				while len(word):
+					line = word[0]
+					#print 'line:', line
+					i = 1
+					while wordart_size(word[:i], fontname)[0] <= width and line != word:
+						line = word[:i]
+						#print 'line:', line
+						i += 1
+					# }
+					i = max(1, i-1)
+					if line != word:
+						lines.append(line)
+						#print 'newline'
+						line = ''
+					# }
+					word = word[i:]
+				# }
+			# }
+		# }
+		# process space characters (explicit newlines etc)
+		for c in space:
+			if c == '\n':
+				lines.append(line)
+				line = ''
+			else:
+				line = line + c
+			# }
+		# }
+	# }
+	lines.append(line)
+	return '\n'.join(lines)
 # }
 
 def border(text = None, left = 0, right = 0, top = 0, bottom = 0, fillchar = '\0'):
@@ -2870,9 +2923,19 @@ def composite(fgtext, bgtext, pos = (0,0), fgorigin = (0,0), bgorigin = (0,0), m
 	return '\n'.join(''.join(lineit) for lineit in imap(lambda bgline, points: imap(lambda bg, p: chr(ord(fgget(*p)) or ord(bg)), bgline, points), bglines, (izip(xrange(bgw), repeat(y)) for y in xrange(bgh))))
 # }
 
-def cut(text = '', pos = (0,0), size = (0,0), fgorigin = (0,0), bgorigin = (0,0), modular = False, fillchar = '\0'):
+def cut(text = None, pos = (0,0), size = (0,0), fgorigin = (0,0), bgorigin = (0,0), modular = False, fillchar = '\0'):
 	# convenience? complement of composite, kinda
 	return composite(text, fill(size, fillchar), pos=[-x for x in pos], fgorigin=bgorigin, bgorigin=fgorigin, modular=modular)
+# }
+
+def crop(text = None, left = 0, right = 0, top = 0, bottom = 0):
+	tw, th = size(text)
+	return cut(text, pos=(left, bottom), size=(max(tw - right - left, 0), max(th - top - bottom, 0)))
+# }
+
+def strip(text = None, chars = ' '):
+	# TODO only if really needed
+	raise Exception('unimplemented')
 # }
 
 def box(text = None, size = (0,0), fillchar = '\0', toppat = '+-+', bottompat = '+-+', leftpat = '|', rightpat = '|'):
@@ -2888,25 +2951,147 @@ def box(text = None, size = (0,0), fillchar = '\0', toppat = '+-+', bottompat = 
 
 class TextArea(object):
 	
-	def __init__(fontname, size):
+	def __init__(self, size, fontname):
 		self.fontname = fontname
 		self.size = size
+		self.align = 'l'
 		self.text = ''
+		self.fillchar = '\0'
 		self.cursor = 0
+		self.scroll = 0.0 # in lines
+		self.scrollorigin = 0.0 # fraction of size[1], top==0
+		self.lineorigin = 0.0 # fraction of line height, top==0
+		self.showcursor = False
+		self._cache = {}
 	# }
 	
-	def insert(self, text):
+	def _line_height(self):
+		return wordart_size(' ', self.fontname)[1]
+	# }
+	
+	def _get_lines(self):
+		lines = self._cache.get('lines', None)
+		if lines is not None: return lines
+		# replace 'hard' LF with CRLF so the LF still occupies a character after splitting
+		lines = wordwrap(self.text.replace('\n', '\r\n'), self.size[0], self.fontname).split('\n')
+		self._cache['lines'] = lines
+		return lines
+	# }
+	
+	def _get_line(self, y):
+		if y < 0: return ''
+		lines = self._get_lines()
+		if y < len(lines): return lines[y]
+		return ''
+	# }
+	
+	def _i2y(self, i):
+		y = 0
+		j = 0
+		lines = self._get_lines()
+		for line in lines:
+			j += len(line)
+			if i < j: break
+			y += 1
+		# }
+		return min(y, len(lines) - 1)
+	# }
+	
+	def _y2i(self, y):
+		lines = self._get_lines()
+		y = max(min(int(y), len(lines) - 1), 0)
+		j = 0
+		for line in lines[:y]: j += len(line)
+		return j
+	# }
+	
+	def _safe_cursor(self):
+		return min(max(self.cursor, 0), len(self.text))
+	# }
+	
+	def move_cursor(self, dx = 0, dy = 0):
+		i = self._safe_cursor()
+		y = self._i2y(i)
+		x = i - self._y2i(y)
+		self.cursor = self._y2i(y - 1) + x + dx
+	# }
+	
+	def insert(self, text, advance = True):
 		''' Insert text at cursor. '''
-		i = min(max(self.cursor, 0), len(self.text))
+		i = self._safe_cursor()
 		self.text = self.text[:i] + text + self.text[i:]
+		self.cursor = i + len(text) if advance else 0
+		self.invalidate()
 	# }
 	
-	def __str__(self):
+	def erase(self, text, delta = 1):
+		''' Erase text at cursor position. delta=1: delete; delta=-1: backspace. '''
 		# TODO
 		pass
 	# }
 	
+	def scroll_to(self, i):
+		self.invalidate()
+		i = min(max(i, 0), len(self.text))
+		lines = self._get_lines()
+		y = self._i2y(i)
+		# TODO test this?
+		offset = (self.size[1] / self._line_height() * self.scrollorigin) - self.lineorigin
+		scrollmax = y + offset
+		scrollmin = y - self.size[1] / self._line_height() + 1 + offset
+		self.scroll = max(min(self.scroll, scrollmax), scrollmin)
+	# }
+	
+	def scroll_to_cursor(self):
+		self.scroll_to(self.cursor)
+	# }
+	
+	def invalidate(self):
+		self._cache = {}
+	# }
+	
+	# TODO autotype input
+	
+	def __str__(self):
+		# TODO cache display text
+		# TODO display cursor (blinking)
+		lines = self._get_lines()
+		ymin = int(math.floor(self.scroll - (self.size[1] / self._line_height() * self.scrollorigin) + self.lineorigin))
+		ymax = ymin + int(math.ceil(self.size[1] / self._line_height())) + 1
+		art = fill(self.size, self.fillchar)
+		alignfactor = { 'l' : 0.0, 'c' : 0.5, 'r' : 1.0 }.get(self.align, 0.0)
+		for y in xrange(ymin, ymax):
+			line = self._get_line(y)
+			art = composite(wordart(line.strip(), self.fontname), art, pos=(0, (self.scroll - y) * self._line_height()), fgorigin=(alignfactor, 1 - self.lineorigin), bgorigin=(alignfactor, 1 - self.scrollorigin))
+		# }
+		return art
+	# }
+	
 # }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
