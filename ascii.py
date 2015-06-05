@@ -3016,6 +3016,26 @@ class TextArea(object):
 	# }
 	
 	def _update(self):
+		# autotype pending text
+		# do this first as it can affect the blink state
+		if len(self._pendingtext):
+			if self.writewait <= 0:
+				c = self._pendingtext[0]
+				# skip nulls, allows them to be used for 'pause'
+				if c != '\0':
+					self.insert(c)
+					self.writewait = self.writeinterval
+				else:
+					# use cursor blink interval for pause
+					self.writewait = self.blinkinterval
+				# }
+				self.scroll_to_cursor()
+				self._pendingtext = self._pendingtext[1:]
+				self.invalidate()
+			else:
+				self.writewait -= 1
+			# }
+		# }
 		# update cursor blink
 		if self.blinkwait <= 0:
 			self.blinkwait = self.blinkinterval
@@ -3026,32 +3046,24 @@ class TextArea(object):
 		# }
 		# set blink character in font
 		_load_aafont(self.fontname)['\xFF'] = fill((1, self._line_height()), '|' if self.blink else '\0')
-		# autotype pending text
-		if len(self._pendingtext):
-			if self.writewait <= 0:
-				self.writewait = self.writeinterval
-				self.insert(self._pendingtext[0])
-				self.scroll_to_cursor()
-				self._pendingtext = self._pendingtext[1:]
-				self.invalidate()
-			else:
-				self.writewait -= 1
-			# }
-		# }
 	# }
 	
 	def move_cursor(self, dx = 0, dy = 0):
 		i = self._safe_cursor()
 		y = self._i2y(i)
 		x = i - self._y2i(y)
-		self.cursor = self._y2i(y - 1) + x + dx
+		y += dy
+		x += dx
+		self.cursor = self._y2i(y) + max(min(x, len(self._get_line(y)) - 1), 0)
 	# }
 	
 	def insert(self, text, advance = True):
-		''' Insert text at cursor. '''
+		''' Insert text at cursor position. '''
 		i = self._safe_cursor()
 		self.text = self.text[:i] + text + self.text[i:]
 		self.cursor = i + len(text) if advance else 0
+		self.blink = False
+		self.blinkwait = 0
 		self.invalidate()
 	# }
 	
@@ -3109,7 +3121,7 @@ class TextArea(object):
 				# add special character at cursor pos
 				line = line[:cx] + '\xFF' + line[cx:]
 			# }
-			art = composite(wordart(line.strip(), self.fontname), art, pos=(0, (self.scroll - y) * self._line_height() + 0.5), fgorigin=(alignfactor, 1 - self.lineorigin), bgorigin=(alignfactor, 1 - self.scrollorigin))
+			art = composite(wordart(line.strip(' \t\r\n'), self.fontname), art, pos=(0, (self.scroll - y) * self._line_height() + 0.5), fgorigin=(alignfactor, 1 - self.lineorigin), bgorigin=(alignfactor, 1 - self.scrollorigin))
 		# }
 		self._cache['__str__'] = art
 		return art
