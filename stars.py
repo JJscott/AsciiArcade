@@ -33,12 +33,12 @@ class StarsGame(object):
 		# Load geometry
 		# 
 		self.assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
-		self.assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/AsteroidT1.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/AsteroidT2.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/AsteroidT3.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/AsteroidT4.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/AsteroidT5.obj", center=True)
-		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/ShipT.obj")
+		self.assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
+		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
+		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/Ship.obj")
 		self.assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
 
 		# Load shader
