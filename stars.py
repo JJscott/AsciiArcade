@@ -38,7 +38,7 @@ class StarsGame(object):
 		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
 		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
 		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
-		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/Ship.obj")
+		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/SHIP.obj")
 		self.assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
 
 		# Load shader
@@ -253,7 +253,7 @@ class Ship(object):
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
-		self.speed = -0.5
+		self.speed = -1.0
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
@@ -392,12 +392,12 @@ class AsteroidField(object):
 			self.asteroid_sphere_list[i] = assets.get_geometry_sphere(tag="asteroid{num}".format(num=i))
 
 
-	def _create_astroid(self, pos, vel=(0,0,0), rot=(0,0,0), rewind=0):
+	def _create_astroid(self, pos, vel=(0,0,0), rot=(0,0,0), size=1, rewind=0):
 		n = randrange(1, 6)
 		if rewind is not 0:
 			pos = vec3(pos) - (vec3(vel) * (rewind))
 
-		a = Asteroid(pos, ast_num=n, vel=vel, rot=rot)
+		a = Asteroid(pos, vel=vel, rot=rot, size=size, ast_num=n)
 		a.sph = self.asteroid_sphere_list[n]
 		self.asteroid_list.append(a)
 
@@ -412,10 +412,12 @@ class AsteroidField(object):
 		# Generate level ahead
 		# 
 		# Will figure it out later
-		p = vec3((sx + random() * 60 - 30, sy + random() * 60 - 30, sz - 50))
+		a_range = 150
+		p = vec3((sx + (random()-0.5) * a_range, sy + (random()-0.5) * a_range, sz - 100))
 		v = vec3.random() * 0.05
 		r = vec3.random() * random() * math.pi * 0.1
-		self._create_astroid(pos=p, vel=v, rot=r)
+		s = random() * 4 + 0.1
+		self._create_astroid(pos=p, vel=v, rot=r, size=s)
 
 		# Update the positions of the astroids
 		# 
@@ -452,8 +454,9 @@ class AsteroidField(object):
 				# Set up matricies
 				#
 				rotation = mat4.rotateFromQuat(a.orientation)
+				scale = mat4.scale(a.size,a.size,a.size)
 				position = mat4.translate(a.position.x, a.position.y, a.position.z)
-				mv = (view * position * rotation * model).transpose()
+				mv = (view * position * rotation * scale * model).transpose()
 				mv_array.extend(mv.flatten())
 				count += 1
 
@@ -476,12 +479,13 @@ class AsteroidField(object):
 
 class Asteroid(object):
 	"""docstring for Asteroid"""
-	def __init__(self, pos, ast_num=1, vel=(0,0,0), rot=(0,0,0)):
+	def __init__(self, pos, vel=(0,0,0), rot=(0,0,0), size=1, ast_num=1):
 		super(Asteroid, self).__init__()
 		self.position = vec3(pos) 
 		self.velocity = vec3(vel)
 		self.rotation = vec3(rot)
 		self.orientation = quat.axisangle(vec3.random(), 2 * math.pi * random()).unit()
+		self.size = size
 		self.ast_num = ast_num
 
 		self.sph = sphere([0,0,0],0)
@@ -519,6 +523,6 @@ class Asteroid(object):
 
 
 	def get_sphere(self):
-		return sphere(self.sph.center + self.position, self.sph.radius * 1.5) #TODO change radius of asteroid
+		return sphere(self.sph.center + self.position, self.sph.radius * self.size * 1.5) #TODO change radius of asteroid
 	
 	
