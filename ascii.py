@@ -2962,6 +2962,12 @@ class TextArea(object):
 		self.scrollorigin = 0.0 # fraction of size[1], top==0
 		self.lineorigin = 0.0 # fraction of line height, top==0
 		self.showcursor = False
+		self.blink = False
+		self.blinkinterval = 0
+		self.writeinterval = 0
+		self.blinkwait = 0
+		self.writewait = 0
+		self._pendingtext = ''
 		self._cache = {}
 	# }
 	
@@ -3009,6 +3015,31 @@ class TextArea(object):
 		return min(max(self.cursor, 0), len(self.text))
 	# }
 	
+	def _update(self):
+		# update cursor blink
+		if self.blinkwait <= 0:
+			self.blinkwait = self.blinkinterval
+			self.blink = not self.blink
+			self.invalidate()
+		else:
+			self.blinkwait -= 1
+		# }
+		# set blink character in font
+		_load_aafont(self.fontname)['\xFF'] = fill((1, self._line_height()), '|' if self.blink else '\0')
+		# autotype pending text
+		if len(self._pendingtext):
+			if self.writewait <= 0:
+				self.writewait = self.writeinterval
+				self.insert(self._pendingtext[0])
+				self.scroll_to_cursor()
+				self._pendingtext = self._pendingtext[1:]
+				self.invalidate()
+			else:
+				self.writewait -= 1
+			# }
+		# }
+	# }
+	
 	def move_cursor(self, dx = 0, dy = 0):
 		i = self._safe_cursor()
 		y = self._i2y(i)
@@ -3030,6 +3061,14 @@ class TextArea(object):
 		pass
 	# }
 	
+	def write(self, text):
+		self._pendingtext = self._pendingtext + text
+	# }
+	
+	def write_cancel(self):
+		self._pendingtext = ''
+	# }
+	
 	def scroll_to(self, i):
 		self.invalidate()
 		i = min(max(i, 0), len(self.text))
@@ -3046,15 +3085,18 @@ class TextArea(object):
 		self.scroll_to(self.cursor)
 	# }
 	
+	def line_count(self):
+		return len(self._get_lines())
+	# }
+	
 	def invalidate(self):
 		self._cache = {}
 	# }
 	
-	# TODO autotype input
-	
 	def __str__(self):
-		# TODO cache display text
-		# TODO display cursor (blinking)
+		self._update()
+		output = self._cache.get('__str__', None)
+		if output is not None: return output
 		lines = self._get_lines()
 		ymin = int(math.floor(self.scroll - (self.size[1] / self._line_height() * self.scrollorigin) + self.lineorigin))
 		ymax = ymin + int(math.ceil(self.size[1] / self._line_height())) + 1
@@ -3062,8 +3104,14 @@ class TextArea(object):
 		alignfactor = { 'l' : 0.0, 'c' : 0.5, 'r' : 1.0 }.get(self.align, 0.0)
 		for y in xrange(ymin, ymax):
 			line = self._get_line(y)
-			art = composite(wordart(line.strip(), self.fontname), art, pos=(0, (self.scroll - y) * self._line_height()), fgorigin=(alignfactor, 1 - self.lineorigin), bgorigin=(alignfactor, 1 - self.scrollorigin))
+			if self.showcursor and y == self._i2y(self.cursor):
+				cx = self._safe_cursor() - self._y2i(y)
+				# add special character at cursor pos
+				line = line[:cx] + '\xFF' + line[cx:]
+			# }
+			art = composite(wordart(line.strip(), self.fontname), art, pos=(0, (self.scroll - y) * self._line_height() + 0.5), fgorigin=(alignfactor, 1 - self.lineorigin), bgorigin=(alignfactor, 1 - self.scrollorigin))
 		# }
+		self._cache['__str__'] = art
 		return art
 	# }
 	
