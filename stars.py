@@ -57,7 +57,7 @@ class StarsGame(object):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["ship"] = Ship()
-		self.scene["asteroid_field"] = AsteroidField(self.assets, (5,5))
+		self.scene["asteroid_field"] = AsteroidField(self.assets)
 	
 
 	# Game logic
@@ -253,7 +253,7 @@ class Ship(object):
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
-		self.speed = -0.2
+		self.speed = -0.5
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
@@ -267,11 +267,13 @@ class Ship(object):
 		# cam_Xrot = -math.pi / 6
 		# cam_Xrot = -math.pi / 3
 		# ship_pos =  vec3([0, 0, self.position.z])
-		ship_pos = vec3([self.position.x * 0.9, self.position.y * 0.9, self.position.z])
+		ship_pos = vec3([self.position.x, self.position.y, self.position.z])
 		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
 			mat4.rotateX(cam_Xrot) *
 			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z)).inverse()
 
+	# Spheres suited to ship model
+	# 	approx sphere 0,0,0 radius 4
 	def get_sphere_list(self):
 		all_spheres = [sphere(self.position + vec3([0, 0, -1.0]), 0.5)]
 		wing_offset = [ 
@@ -304,22 +306,22 @@ class Ship(object):
 			move = vec3([dx, dy, 0])
 
 			if move.mag() != 0:
-				move = move.unit() * 0.2 # parameterize screen move speed
-				nx = max(min(self.position.x + move.x, 5), -5) # parametirze screen bounds?
-				ny = max(min(self.position.y + move.y, 4), -4)
+				move = move.unit() * 1.0 # parameterize screen move speed
+				nx = self.position.x + move.x
+				ny = self.position.y + move.y
 				self.position = vec3([nx, ny, self.position.z])
 			
 
 			# Move foward
 			#
 			self.position = self.position + vec3([0, 0, self.speed])
-			self.speed *= 1.001
 
 
 			# Colision detection
 			#
+			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
-			if any( ship_sphere.sphere_intersection(ast_sphere) <=0 for ship_sphere in ship_spheres for ast_sphere in scene["asteroid_field"].get_sphere_list() ):
+			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in [a for a in scene["asteroid_field"].get_sphere_list()] if ship_broad_sphere.sphere_intersection(a) <=0 ):
 				self.dead = True
 				# pass
 							
@@ -378,32 +380,50 @@ class Ship(object):
 
 
 
+
 class AsteroidField(object):
 
 	"""docstring for AsteroidField"""
-	def __init__(self, assets, (xbound, ybound) ):
+	def __init__(self, assets):
 		super(AsteroidField, self).__init__()
 		self.asteroid_list = []
-		for _ in range(50):
-			pos = vec3(((random() - 0.5) * 2 * xbound, (random() - 0.5) * 2 * ybound, randrange(-1000, -5)))
-			v = vec3.random() * random() * 0.01
-			r = vec3.random() * math.pi * random() * 0.01
-			m = randrange(1, 6)
+		self.asteroid_sphere_list = {}
+		for i in xrange(1,6):
+			self.asteroid_sphere_list[i] = assets.get_geometry_sphere(tag="asteroid{num}".format(num=i))
 
-			self.asteroid_list.append(Asteroid(pos, ast_num=m, vel=v, rot=r) )
+
+	def _create_astroid(self, pos, vel=(0,0,0), rot=(0,0,0), rewind=0):
+		n = randrange(1, 6)
+		if rewind is not 0:
+			pos = vec3(pos) - (vec3(vel) * (rewind))
+
+		a = Asteroid(pos, ast_num=n, vel=vel, rot=rot)
+		a.sph = self.asteroid_sphere_list[n]
+		self.asteroid_list.append(a)
+
 			
 	def update(self, scene, pressed):
+		
+		# Trim the astroids behind the ship
+		# 
+		sx, sy, sz = scene["ship"].position
+		self.asteroid_list = [a for a in self.asteroid_list if a.position.z < sz  + 5]
+
+		# Generate level ahead
+		# 
+		# Will figure it out later
+		p = vec3((sx + random() * 60 - 30, sy + random() * 60 - 30, sz - 50))
+		v = vec3.random() * 0.05
+		r = vec3.random() * random() * math.pi * 0.1
+		self._create_astroid(pos=p, vel=v, rot=r)
+
+		# Update the positions of the astroids
+		# 
 		for a in self.asteroid_list:
 			a.update(scene, pressed)
 	
 
 	def draw(self, gl, assets, proj, view):
-		# draw_list = defaultdict(lambda: [], {})
-		# for a in self.asteroid_list:
-		# 	draw_list[a.ast_num].append(a)
-		# 	a.draw(gl, assets, proj, view)
-
-
 		prog = assets.get_shader(tag="asteroid")
 		gl.glUseProgram(prog)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
@@ -468,7 +488,8 @@ class Asteroid(object):
 	
 	def update(self, scene, pressed):
 		self.position = self.position + self.velocity
-		self.orientation = self.orientation.multiply(quat.axisangle(self.rotation, self.rotation.mag()).unit())
+		if (self.rotation.mag() > 0):
+			self.orientation = self.orientation.multiply(quat.axisangle(self.rotation, self.rotation.mag()).unit())
 	
 	# def draw(self, gl, assets, proj, view):
 	# 	# HACK to get sphere
