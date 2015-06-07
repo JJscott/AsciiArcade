@@ -55,8 +55,8 @@ render = render_normal
 
 
 def run():
-	width = 800
-	height = 600
+	width = 1278
+	height = 800
 	tick = 16		#milliseconds
 	
 	# Initilise pyGame and create window
@@ -86,7 +86,8 @@ def run():
 				return
 			if event.type == VIDEORESIZE:
 				width, height = event.size
-				screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
+				# this destroys and recreates the GL context; undesirable
+				#screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
 			if event.type == KEYDOWN:
 				if event.key == K_BACKSPACE:
 					global render
