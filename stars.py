@@ -346,14 +346,13 @@ class Ship(object):
 			#
 			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
+			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)):
+				self.dead = True
+				return
+
 			# if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in [a for a in scene["asteroid_field"].get_sphere_list()] if ship_broad_sphere.sphere_intersection(a) <=0 ):
 			# 	self.dead = True
 				# pass
-							
-
-			# Update target
-			#
-
 
 			# Update Bullets"
 			#
@@ -509,7 +508,7 @@ class AsteroidField(object):
 		max_z = sph.center.z + sph.radius
 
 		return [s for as_slice in self.asteroid_slice_list for s in as_slice.get_sphere_list()
-			if as_slice.min_b.z < max_z and as_slice.max_b.z > min_z and s]
+			if as_slice.min_b.z < max_z and as_slice.max_b.z > min_z and s.sphere_intersection(sph) <= 0]
 
 
 
@@ -527,7 +526,7 @@ class AsteroidSlice(object):
 		self._generate_asteroids(ast_sphere_list)
 
 	def _generate_asteroids(self, ast_sphere_list):
-		num_ast = abs(self.size.x * self.size.y * self.size.z) // 10000
+		num_ast = abs(self.size.x * self.size.y * self.size.z) / 100000
 
 		for i in range(int(num_ast)):
 			p = vec3([random(), random(), random()]).mul(self.size) + self.min_b
