@@ -91,7 +91,7 @@ class StarsGame(object):
 
 		# Create view and projection matrix
 		#
-		proj = mat4.perspectiveProjection(math.pi / 3, float(w)/h, znear, zfar)
+		proj = mat4.perspectiveProjection(math.pi / 2, float(w)/h, znear, zfar)
 		view = self.scene["ship"].get_view_matrix()
 
 		# Render all objects in the scene
@@ -253,7 +253,7 @@ class Ship(object):
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
-		self.speed = -1.0
+		self.speed = -2.0
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
@@ -321,8 +321,8 @@ class Ship(object):
 			#
 			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
-			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in [a for a in scene["asteroid_field"].get_sphere_list()] if ship_broad_sphere.sphere_intersection(a) <=0 ):
-				self.dead = True
+			# if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in [a for a in scene["asteroid_field"].get_sphere_list()] if ship_broad_sphere.sphere_intersection(a) <=0 ):
+			# 	self.dead = True
 				# pass
 							
 
@@ -386,43 +386,42 @@ class AsteroidField(object):
 	"""docstring for AsteroidField"""
 	def __init__(self, assets):
 		super(AsteroidField, self).__init__()
-		self.asteroid_list = []
+		self.asteroid_slice_list = []
 		self.asteroid_sphere_list = {}
 		for i in xrange(1,6):
 			self.asteroid_sphere_list[i] = assets.get_geometry_sphere(tag="asteroid{num}".format(num=i))
 
-
-	def _create_astroid(self, pos, vel=(0,0,0), rot=(0,0,0), size=1, rewind=0):
-		n = randrange(1, 6)
-		if rewind is not 0:
-			pos = vec3(pos) - (vec3(vel) * (rewind))
-
-		a = Asteroid(pos, vel=vel, rot=rot, size=size, ast_num=n)
-		a.sph = self.asteroid_sphere_list[n]
-		self.asteroid_list.append(a)
+		self.next_slice_distance = 200 # How far away the next chunk should be generated
+		self.last_slice_distance = -100 # The last min of the chunk
 
 			
 	def update(self, scene, pressed):
 		
-		# Trim the astroids behind the ship
+		# Trim the astroid slices behind the ship
 		# 
 		sx, sy, sz = scene["ship"].position
-		self.asteroid_list = [a for a in self.asteroid_list if a.position.z < sz  + 5]
+		self.asteroid_slice_list = [a for a in self.asteroid_slice_list if a.min_b.z < sz + 5 ]
+
 
 		# Generate level ahead
 		# 
-		# Will figure it out later
-		a_range = 150
-		p = vec3((sx + (random()-0.5) * a_range, sy + (random()-0.5) * a_range, sz - 100))
-		v = vec3.random() * 0.05
-		r = vec3.random() * random() * math.pi * 0.1
-		s = random() * 4 + 0.1
-		self._create_astroid(pos=p, vel=v, rot=r, size=s)
+		width = 150
+		depth = 20
 
-		# Update the positions of the astroids
+		# If the last slice is closer than next_slice_distance away from the ship
+		if self.last_slice_distance > sz - self.next_slice_distance:
+			min_b = vec3([sx-width, sy-width, self.last_slice_distance-depth ])
+			max_b = vec3([sx+width, sy+width, self.last_slice_distance ])
+
+			self.asteroid_slice_list.append(AsteroidSlice(self.asteroid_sphere_list, min_b, max_b))
+			self.last_slice_distance = min_b.z
+
+			print "AST COUNT", len([a for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids()])
+
+		# Update the astroids slices
 		# 
-		for a in self.asteroid_list:
-			a.update(scene, pressed)
+		# for a in self.asteroid_slice_list:
+		# 	a.update(scene, pressed)
 	
 
 	def draw(self, gl, assets, proj, view):
@@ -449,7 +448,7 @@ class AsteroidField(object):
 			# Create the instance data
 			# 
 			count = 0
-			for a in [a for a in self.asteroid_list if a.ast_num == i]:
+			for a in [a for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids() if a.ast_num == i]:
 
 				# Set up matricies
 				#
@@ -474,15 +473,69 @@ class AsteroidField(object):
 
 	def get_sphere_list(self):
 		# Need t return a generator for all the asteroids
+		return [a.get_sphere() for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids()]
+
+
+	# Returns a list of sphere that interset with the given sphere
+	# Makes some assumptions based on asteroid slicing
+	# 
+	def get_asteroid_collisions(self, sph):
+		min_z = sph.center.z - sph.radius
+		max_z = sph.center.z + sph.radius
+
+		return [s for as_slice in self.asteroid_slice_list for s in as_slice.get_sphere_list()
+			if as_slice.min_b.z < max_z and as_slice.max_b.z > min_z and s]
+
+
+
+# Best thing since sliced bread
+# 
+class AsteroidSlice(object):
+	"""docstring for AsteroidSlice, the best thing since sliced bread"""
+	def __init__(self, ast_sphere_list, min_b, max_b):
+		super(AsteroidSlice, self).__init__()
+		self.min_b = vec3(min_b)
+		self.max_b = vec3(max_b)
+		self.size = vec3(self.max_b - self.min_b)
+
+		self.asteroid_list = []
+		self._generate_asteroids(ast_sphere_list)
+
+	def _generate_asteroids(self, ast_sphere_list):
+		num_ast = abs(self.size.x * self.size.y * self.size.z) // 10000
+
+		for i in range(int(num_ast)):
+			p = vec3([random(), random(), random()]).mul(self.size) + self.min_b
+			if random() > 0.5:
+				r = vec3.random() * random() * math.pi * 0.02
+				s = random() * 4 + 0.1
+				n = randrange(1, 6)
+				a = Asteroid(p, rot=r, size=s, ast_num=n)
+				a.sph = ast_sphere_list[n]
+				self.asteroid_list.append(a)
+	
+	def get_asteroids(self):
+		return self.asteroid_list
+
+	def get_sphere_list(self):
 		return [a.get_sphere() for a in self.asteroid_list]
+
+
+	# def get_asteroid_collisions(self, sph):
+		# Can optmize further
+		# 
+		# return [a for a in self.asteroid_list if a.sphere_intersection(sphere)]
+
+	def update(self, scene, pressed):
+		map(lambda x : x.update(scene, pressed), self.asteroid_list)
+
 
 
 class Asteroid(object):
 	"""docstring for Asteroid"""
-	def __init__(self, pos, vel=(0,0,0), rot=(0,0,0), size=1, ast_num=1):
+	def __init__(self, pos, rot=(0,0,0), size=1, ast_num=1):
 		super(Asteroid, self).__init__()
 		self.position = vec3(pos) 
-		self.velocity = vec3(vel)
 		self.rotation = vec3(rot)
 		self.orientation = quat.axisangle(vec3.random(), 2 * math.pi * random()).unit()
 		self.size = size
@@ -491,35 +544,8 @@ class Asteroid(object):
 		self.sph = sphere([0,0,0],0)
 	
 	def update(self, scene, pressed):
-		self.position = self.position + self.velocity
 		if (self.rotation.mag() > 0):
 			self.orientation = self.orientation.multiply(quat.axisangle(self.rotation, self.rotation.mag()).unit())
-	
-	# def draw(self, gl, assets, proj, view):
-	# 	# HACK to get sphere
-	# 	# 
-	# 	self.sph = assets.get_geometry_sphere(tag="asteroid1")
-
-	# 	# Set up matricies
-	# 	#
-	# 	model = mat4.scale(2,2,2) * mat4.rotateFromQuat(self.orientation)
-	# 	position = mat4.translate(self.position.x, self.position.y, self.position.z)
-	# 	mv = view * position * model
-
-	# 	# Retreive model and shader
-	# 	#
-	# 	vao, vao_size = assets.get_geometry(tag="asteroid1")
-	# 	prog = assets.get_shader(tag="asteroid")
-
-	# 	# Render
-	# 	# 
-	# 	gl.glUseProgram(prog)
-	# 	gl.glBindVertexArray(vao)
-
-	# 	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
-	# 	gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
-
-	# 	gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
 
 
 	def get_sphere(self):

@@ -44,6 +44,10 @@ class vec3(object):
 		x, y, z = v;
 		return vec3((self[0] - x, self[1] - y, self[2] - z))
 
+	def mul(self, v):
+		x, y, z = v;
+		return vec3((self[0] * x, self[1] * y, self[2] * z))
+
 
 	def dot(self, v):
 		x, y, z = v;
