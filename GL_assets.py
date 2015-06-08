@@ -111,13 +111,18 @@ def _load_geometry(gl, filename, center, inst=False):
 	radius = 0.0
 	for idk in vertsOut:
 		p = vec3(idk)
-		v = vec3(p) - p0
+		v = p - p0
 		if v.dot(v) > radius**2:
 			# point outside bubble
-			p0 = (p0 - v.unit().scale(radius) + p) * 0.5
+			p0 = (p0 - v.unit().scale(radius) + p).scale(0.5)
 			radius = (p - p0).mag()
 
 	vao, vbo_mv = _createVAO(gl, vertsOut, normsOut, textsOut, inst)
+
+	print "SOPHERE"
+	print p0
+	print radius
+
 	return vao, vbo_mv, len(vertsOut), sphere(p0, radius)
 
 
@@ -169,7 +174,6 @@ def _createVAO(gl, vert, norm, tex, mv_inst = False):
 		gl.glGenBuffers(1, vbo_mv)
 		gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_mv)
 		mv = mat4.identity()
-
 		for r in xrange(4):
 			row = pygloo.c_array(GLfloat, mv.row(r))
 			gl.glVertexAttribPointer( 3 + r, 4, GL_FLOAT, False, sizeof(row)*4, sizeof(row) * r )

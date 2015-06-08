@@ -3,21 +3,29 @@
 from math import *
 import random
 
+# HAHAHAHAH
+# It's all secretly numpy!!!!
+# 
+import numpy as np
+
+_EPS = np.finfo(float).eps * 4.0
+
 class vec3(object):
 	"""docstring for vec3"""
 	def __init__(self, arg):
 		super(vec3, self).__init__()
-		x, y, z = arg
-		self._v = (x, y, z)
+		if isinstance(arg, vec3):
+			self._v = arg._v
+		else :
+			self._v = np.array(arg)
 
 	def __getattr__(self, attr):
 		if attr is 'x':
-			return self[0]
+			return self._v[0]
 		if attr is 'y':
-			return self[1]
+			return self._v[1]
 		if attr is 'z':
-			return self[2]
-
+			return self._v[2]
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
 
 	@staticmethod
@@ -37,64 +45,54 @@ class vec3(object):
 		return vec3([random.random()-0.5,random.random()-0.5,random.random()-0.5]).unit()
 
 	def add(self, v):
-		x, y, z = v;
-		return vec3((self[0] + x, self[1] + y, self[2] + z))
+		return vec3(self._v+v._v)
 
 	def sub(self, v):
-		x, y, z = v;
-		return vec3((self[0] - x, self[1] - y, self[2] - z))
+		return vec3(self._v-v._v)
 
 	def mul(self, v):
-		x, y, z = v;
-		return vec3((self[0] * x, self[1] * y, self[2] * z))
-
+		return vec3(self._v*v._v)
 
 	def dot(self, v):
-		x, y, z = v;
-		return self[0] * x + self[1] * y + self[2] * z
+		return np.dot(self._v, v._v)
 
 	def cross(self, v):
-		x, y, z = v
-		return vec3([
-			self.y * z - self.z * y,
-			self.z * x - self.x * z,
-			self.x * y - self.y * x])
+		return vec3(np.cross(self._v, v._v))
 
 	def neg(self):
-		return vec3((-self[0], -self[1], -self[2]))
+		return vec3(-self._v)
 
 	def unit(self):
-		return self.scale(1.0/self.mag())
+		return vec3(self._v * (1/self.mag()))
 		
-
 	def mag(self):
-		return sqrt(self[0]**2 + self[1]**2 + self[2]**2)
+		return np.linalg.norm(self._v)
 
 	def scale(self, s):
-		return vec3((self[0] * s, self[1] * s, self[2] * s))
+		return vec3(self._v * s)
 
 
 	def __add__(self, r):
-		return self.add(r)
+		return vec3(self._v+r._v)
 	def __radd__(self, l):
-		return vec3(l).add(self)
+		return vec3(l._v-self._v)
 
 	def __sub__(self, r):
-		return self.sub(r)
+		return vec3(self._v-r._v)
 	def __rsub__(self, l):
-		return vec3(l).sub(self)
+		return vec3(l._v-self._v)
 
 	"""v1 * s will call self.scale(s)"""
 	def __mul__(self, r):
-		return self.scale(r)
+		return vec3(self._v*r._v)
 	def __rmul__(self, l):
-		return self.scale(l)
+		return vec3(l._v*self._v)
 
 	"""v1 ** v2 will call v1.cross(r)"""
 	def __pow__(self, r):
-		return self.cross(r)
+		return vec3(np.cross(self._v, r._v))
 	def __rpow__(self, l):
-		return vec3(l).cross(self)
+		return vec3(np.cross(l._v, self._v,))
 
 
 
@@ -117,69 +115,87 @@ class vec4(object):
 	"""docstring for vec4"""
 	def __init__(self, arg):
 		super(vec4, self).__init__()
-		x, y, z, w = arg
-		self._v = (x, y, z, w)
+		if isinstance(arg, vec4):
+			self._v = arg._v
+		else :
+			self._v = np.array(arg)
 
 	def __getattr__(self, attr):
 		if attr is 'x':
-			return self[0]
+			return self._v[0]
 		if attr is 'y':
-			return self[1]
+			return self._v[1]
 		if attr is 'z':
-			return self[2]
+			return self._v[2]
 		if attr is 'w':
-			return self[3]
+			return self._v[2]
 		if attr is 'xyz':
-			return vec3((self[0], self[1], self[2]))
-
+			return vec3([self._v[0], self._v[1], self._v[2]])
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
 
+	@staticmethod
+	def i():
+		return vec4([1,0,0,1])
+
+	@staticmethod
+	def j():
+		return vec4([0,1,0,1])
+
+	@staticmethod
+	def k():
+		return vec4([0,0,1,1])
+
+	@staticmethod
+	def from_vec3(v, w):
+		return vec4(v[0], v[1], v[2], w)
 
 	def add(self, v):
-		x, y, z, w = v;
-		return vec4((self[0] + x, self[1] + y, self[2] + z, self[3] + w))
+		return vec4(self._v+v._v)
 
 	def sub(self, v):
-		x, y, z, w = v;
-		return vec4((self[0] - x, self[1] - y, self[2] - z, self[3] - w))
+		return vec4(self._v-v._v)
 
+	def mul(self, v):
+		return vec4(self._v*v._v)
 
 	def dot(self, v):
-		x, y, z, w = v;
-		return self[0] * x + self[1] * y + self[2] * z + self[3] * w
+		return np.dot(self._v, v._v)
 
 	def neg(self):
-		return vec4((-self[0], -self[1], -self[2], -self[3]))
+		return vec4(-self._v)
 
 	def unit(self):
-		return scale(self, 1.0/self.mag())
+		return vec4(self._v * (1/self.mag()))
 		
-
 	def mag(self):
-		return sqrt(self[0]**2 + self[1]**2 + self[2]**2  + self[3]**2)
+		return np.linalg.norm(self._v)
 
 	def scale(self, s):
-		return vec4((self[0] * s, self[1] * s, self[2] * s, self[3] * s))
-
-	def vec3(self, s):
-		return vec3((self[0], self[1], self[2]))
+		return vec4(self._v * s)
 
 
 	def __add__(self, r):
-		return self.add(r)
+		return vec4(self._v+r._v)
 	def __radd__(self, l):
-		return vec3(l).add(self)
+		return vec4(l._v-self._v)
 
 	def __sub__(self, r):
-		return self.sub(r)
+		return vec4(self._v-r._v)
 	def __rsub__(self, l):
-		return vec3(l).sub(self)
+		return vec4(l._v-self._v)
 
 	"""v1 * s will call self.scale(s)"""
 	def __mul__(self, r):
-		return self.scale(r)
+		return vec4(self._v*r._v)
 	def __rmul__(self, l):
-		return self.scale(l)
+		return vec4(l._v*self._v)
+
+	"""v1 ** v2 will call v1.cross(r)"""
+	def __pow__(self, r):
+		return vec4(np.cross(self._v, r._v))
+	def __rpow__(self, l):
+		return vec4(np.cross(l._v, self._v,))
+
 
 
 	def __iter__(self):
@@ -189,222 +205,143 @@ class vec4(object):
 		return self._v[i]
 
 	def __str__(self):
-		return "(%s, %s, %s, %s)" % (_format_number(self._v[0]), _format_number(self._v[1]), _format_number(self._v[2]), _format_number(self._v[4]))
+		return "(%s, %s, %s)" % (_format_number(self._v[0]), _format_number(self._v[1]), _format_number(self._v[2]))
 
 	def __repr__(self):
-		return "Vec3(%s, %s, %s, %s)" % (self._v[0], self._v[1], self._v[2], self._v[3])
+		return "Vec4(%s, %s, %s)" % (self._v[0], self._v[1], self._v[2])
 
 class mat4(object):
 	"""docstring for mat4"""
 	def __init__(self, arg):
 		super(mat4, self).__init__()
-		e00, e01, e02, e03, e10, e11, e12, e13, e20, e21, e22, e23, e30, e31, e32, e33 = arg
-		self._v = (
-			(e00, e01, e02, e03),
-			(e10, e11, e12, e13),
-			(e20, e21, e22, e23),
-			(e30, e31, e32, e33))
+		if isinstance(arg, mat4):
+			self._v = arg._v
+		else :
+			self._v = np.array(arg)
 	
 	@staticmethod
 	def identity():
 		return mat4([
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1])
+			[1, 0, 0, 0,],
+			[0, 1, 0, 0,],
+			[0, 0, 1, 0,],
+			[0, 0, 0, 1]])
 
 	@staticmethod
 	def translate(tx, ty, tz):
 		return mat4([
-			1, 0, 0, tx,
-			0, 1, 0, ty,
-			0, 0, 1, tz,
-			0, 0, 0, 1])
+			[1, 0, 0, tx,],
+			[0, 1, 0, ty,],
+			[0, 0, 1, tz,],
+			[0, 0, 0, 1]])
 
 	@staticmethod
 	def scale(sx, sy, sz):
 		return mat4([
-			sx, 0, 0, 0,
-			0, sy, 0, 0,
-			0, 0, sz, 0,
-			0, 0, 0, 1])
+			[sx, 0, 0, 0,],
+			[0, sy, 0, 0,],
+			[0, 0, sz, 0,],
+			[0, 0, 0, 1]])
 
 	@staticmethod
 	def rotateX(a):
 		return mat4([
-			1,		0,		0,		0,
-			0,		cos(a),	-sin(a),0,
-			0,		sin(a),	cos(a),	0,
-			0,		0,		0,		1])
+			[1,		0,		0,		0,],
+			[0,		cos(a),	-sin(a),0,],
+			[0,		sin(a),	cos(a),	0,],
+			[0,		0,		0,		1]])
 
 	@staticmethod
 	def rotateY(a):
 		return mat4([
-			cos(a),	0,		sin(a),	0,
-			0,		1,		0,		0,
-			-sin(a),0,		cos(a),	0,
-			0,		0,		0,		1])
+			[cos(a),0,		sin(a),	0,],
+			[0,		1,		0,		0,],
+			[-sin(a),0,		cos(a),	0,],
+			[0,		0,		0,		1]])
 
 	@staticmethod
 	def rotateZ(a):
 		return mat4([
-			cos(a),	-sin(a),0,		0,
-			sin(a),	cos(a),	0,		0,
-			0,		0,		1,		0,
-			0,		0,		0,		1])
+			[cos(a),	-sin(a),0,		0,],
+			[sin(a),	cos(a),	0,		0,],
+			[0,		0,		1,		0,],
+			[0,		0,		0,		1]])
 
 	@staticmethod
-	def rotateFromQuat(q):
-		w = q.w
-		x = q.x
-		y = q.y
-		z = q.y
-
+	def rotateFromQuat(qu):
+		q = qu._v
+		n = np.dot(q, q)
+		if n < _EPS:
+			return np.identity(4)
+		q *= sqrt(2.0 / n)
+		q = np.outer(q, q)
 		return mat4([
-			w * w + x * x - y * y - z * z,
-			2 * x * y - 2 * w * z,
-			2 * x * z + 2 * w * y,
-			0,
-			2 * x * y + 2 * w * z,
-			w * w - x * x + y * y - z * z,
-			2 * y * z - 2 * w * x,
-			0,
-			2 * x * z - 2 * w * y,
-			2 * y * z + 2 * w * x,
-			w * w - x * x - y * y + z * z,
-			0,
-			0,
-			0,
-			0,
-			w * w + x * x + y * y + z * z])
+			[1.0-q[2, 2]-q[3, 3],     q[1, 2]-q[3, 0],     q[1, 3]+q[2, 0], 0.0],
+			[    q[1, 2]+q[3, 0], 1.0-q[1, 1]-q[3, 3],     q[2, 3]-q[1, 0], 0.0],
+			[    q[1, 3]-q[2, 0],     q[2, 3]+q[1, 0], 1.0-q[1, 1]-q[2, 2], 0.0],
+			[                0.0,                 0.0,                 0.0, 1.0]])
 
 	@staticmethod
 	def perspectiveProjection(fovy, aspect, zNear, zFar):
 		f = cos(fovy / 2) / sin(fovy / 2);
 
 		return mat4([
-			f / aspect,	0,		0,		0,
-			0,			f,		0,		0,
-			0,			0,		(zFar + zNear) / (zNear - zFar),	(2 * zFar * zNear) / (zNear - zFar),
-			0,			0,		-1,		0])
+			[f / aspect,0,		0,		0,],
+			[0,			f,		0,		0,],
+			[0,			0,		(zFar + zNear) / (zNear - zFar),	(2 * zFar * zNear) / (zNear - zFar),],
+			[0,			0,		-1,		0]])
 
-	@staticmethod
-	def lookAt(eye, at, up):
-		"""Provides an world to view matrix (the inverse of a view matrix)"""
-		e = vec3(eye)
-		a = vec3(at)
-		u = vec3(up)
-		zaxis = (a - e).unit()
-		xaxis = u.cross(zaxis).unit()
-		yaxis = zaxis.cross(xaxis).unit()
+	# @staticmethod
+	# def lookAt(eye, at, up):
+	# 	"""Provides an world to view matrix (the inverse of a view matrix)"""
+	# 	e = vec3(eye)
+	# 	a = vec3(at)
+	# 	u = vec3(up)
+	# 	zaxis = (a - e).unit()
+	# 	xaxis = u.cross(zaxis).unit()
+	# 	yaxis = zaxis.cross(xaxis).unit()
 
-		ne = e.neg()
+	# 	ne = e.neg()
 
-		return mat4([
-			xaxis.x,		yaxis.x,		zaxis.x,		0,
-			xaxis.y,		yaxis.y,		zaxis.y,		0,
-			xaxis.z,		yaxis.z,		zaxis.z,		0,
-			xaxis.dot(ne),	yaxis.dot(ne),	zaxis.dot(ne),	1]);
+	# 	return mat4([
+	# 		xaxis.x,		yaxis.x,		zaxis.x,		0,
+	# 		xaxis.y,		yaxis.y,		zaxis.y,		0,
+	# 		xaxis.z,		yaxis.z,		zaxis.z,		0,
+	# 		xaxis.dot(ne),	yaxis.dot(ne),	zaxis.dot(ne),	1]);
 
 
 
 	def multiply_mat4(self, rhs):
-		lpt = self.flatten()
-		rpt = rhs.flatten()
-		return mat4([
-			lpt[0] * rpt[0] + lpt[1] * rpt[4] + lpt[2] * rpt[8] + lpt[3] * rpt[12],
-			lpt[0] * rpt[1] + lpt[1] * rpt[5] + lpt[2] * rpt[9] + lpt[3] * rpt[13],
-			lpt[0] * rpt[2] + lpt[1] * rpt[6] + lpt[2] * rpt[10] + lpt[3] * rpt[14],
-			lpt[0] * rpt[3] + lpt[1] * rpt[7] + lpt[2] * rpt[11] + lpt[3] * rpt[15],
-			lpt[4] * rpt[0] + lpt[5] * rpt[4] + lpt[6] * rpt[8] + lpt[7] * rpt[12],
-			lpt[4] * rpt[1] + lpt[5] * rpt[5] + lpt[6] * rpt[9] + lpt[7] * rpt[13],
-			lpt[4] * rpt[2] + lpt[5] * rpt[6] + lpt[6] * rpt[10] + lpt[7] * rpt[14],
-			lpt[4] * rpt[3] + lpt[5] * rpt[7] + lpt[6] * rpt[11] + lpt[7] * rpt[15],
-			lpt[8] * rpt[0] + lpt[9] * rpt[4] + lpt[10] * rpt[8] + lpt[11] * rpt[12],
-			lpt[8] * rpt[1] + lpt[9] * rpt[5] + lpt[10] * rpt[9] + lpt[11] * rpt[13],
-			lpt[8] * rpt[2] + lpt[9] * rpt[6] + lpt[10] * rpt[10] + lpt[11] * rpt[14],
-			lpt[8] * rpt[3] + lpt[9] * rpt[7] + lpt[10] * rpt[11] + lpt[11] * rpt[15],
-			lpt[12] * rpt[0] + lpt[13] * rpt[4] + lpt[14] * rpt[8] + lpt[15] * rpt[12],
-			lpt[12] * rpt[1] + lpt[13] * rpt[5] + lpt[14] * rpt[9] + lpt[15] * rpt[13],
-			lpt[12] * rpt[2] + lpt[13] * rpt[6] + lpt[14] * rpt[10] + lpt[15] * rpt[14],
-			lpt[12] * rpt[3] + lpt[13] * rpt[7] + lpt[14] * rpt[11] + lpt[15] * rpt[15]])
-
+		return mat4(np.dot(self._v, rhs._v))
 
 	def multiply_vec4(self, rhs):
-		pt = self.flatten()
-		return vec4([
-			pt[0] * rhs.x + pt[1] * rhs.y + pt[2] * rhs.z + pt[3] * rhs.w,
-			pt[4] * rhs.x + pt[5] * rhs.y + pt[6] * rhs.z + pt[7] * rhs.w,
-			pt[8] * rhs.x + pt[9] * rhs.y + pt[10] * rhs.z + pt[11] * rhs.w,
-			pt[12] * rhs.x + pt[13] * rhs.y + pt[14] * rhs.z + pt[15] * rhs.w])
-
-
-	@staticmethod
-	def _det3x3(e00, e01, e02, e10, e11, e12, e20, e21, e22):
-		d = 0
-		d += e00 * e11 * e22;
-		d += e01 * e12 * e20;
-		d += e02 * e10 * e21;
-		d -= e00 * e12 * e21;
-		d -= e01 * e10 * e22;
-		d -= e02 * e11 * e20;
-		return d;
-
+		return vec4(np.dot(self._v, rhs._v))
 
 	def inverse(self):
-		pt = self.flatten()
-		mpt = [0] * 16
-		
-		# first row of cofactors, can use for determinant
-		c00 = mat4._det3x3(pt[5], pt[6], pt[7], pt[9], pt[10], pt[11], pt[13], pt[14], pt[15]);
-		c01 = -mat4._det3x3(pt[4], pt[6], pt[7], pt[8], pt[10], pt[11], pt[12], pt[14], pt[15]);
-		c02 = mat4._det3x3(pt[4], pt[5], pt[7], pt[8], pt[9], pt[11], pt[12], pt[13], pt[15]);
-		c03 = -mat4._det3x3(pt[4], pt[5], pt[6], pt[8], pt[9], pt[10], pt[12], pt[13], pt[14]);
-		# get determinant by expanding about first row
-		invdet = 1 / (pt[0] * c00 + pt[1] * c01 + pt[2] * c02 + pt[3] * c03);
-		# FIXME proper detect infinite determinant
-		# if (math::isinf(invdet) || invdet != invdet || invdet == 0)
-		# 	throw std::runtime_error("Non-invertible matrix.");
-		# transpose of cofactor matrix * (1 / det)
-		mpt[0] = c00 * invdet;
-		mpt[4] = c01 * invdet;
-		mpt[8] = c02 * invdet;
-		mpt[12] = c03 * invdet;
-		mpt[1] = -mat4._det3x3(pt[1], pt[2], pt[3], pt[9], pt[10], pt[11], pt[13], pt[14], pt[15]) * invdet;
-		mpt[5] = mat4._det3x3(pt[0], pt[2], pt[3], pt[8], pt[10], pt[11], pt[12], pt[14], pt[15]) * invdet;
-		mpt[9] = -mat4._det3x3(pt[0], pt[1], pt[3], pt[8], pt[9], pt[11], pt[12], pt[13], pt[15]) * invdet;
-		mpt[13] = mat4._det3x3(pt[0], pt[1], pt[2], pt[8], pt[9], pt[10], pt[12], pt[13], pt[14]) * invdet;
-		mpt[2] = mat4._det3x3(pt[1], pt[2], pt[3], pt[5], pt[6], pt[7], pt[13], pt[14], pt[15]) * invdet;
-		mpt[6] = -mat4._det3x3(pt[0], pt[2], pt[3], pt[4], pt[6], pt[7], pt[12], pt[14], pt[15]) * invdet;
-		mpt[10] = mat4._det3x3(pt[0], pt[1], pt[3], pt[4], pt[5], pt[7], pt[12], pt[13], pt[15]) * invdet;
-		mpt[14] = -mat4._det3x3(pt[0], pt[1], pt[2], pt[4], pt[5], pt[6], pt[12], pt[13], pt[14]) * invdet;
-		mpt[3] = -mat4._det3x3(pt[1], pt[2], pt[3], pt[5], pt[6], pt[7], pt[9], pt[10], pt[11]) * invdet;
-		mpt[7] = mat4._det3x3(pt[0], pt[2], pt[3], pt[4], pt[6], pt[7], pt[8], pt[10], pt[11]) * invdet;
-		mpt[11] = -mat4._det3x3(pt[0], pt[1], pt[3], pt[4], pt[5], pt[7], pt[8], pt[9], pt[11]) * invdet;
-		mpt[15] = mat4._det3x3(pt[0], pt[1], pt[2], pt[4], pt[5], pt[6], pt[8], pt[9], pt[10]) * invdet;
-		return mat4(mpt);
+		return mat4(np.linalg.inv(self._v))
 
 	def transpose(self):
-		return mat4([e for row in zip(*self._v) for e in row])
+		return mat4(self._v.transpose())
 
 	"""m1 * m2 will call self.multiply_mat4(m2)"""
 	def __mul__(self, r):
-		return self.multiply_mat4(r)
+		return mat4(np.dot(self._v, r._v))
+
 	def __rmul__(self, l):
-		return l.multiply_mat4(self)
+		return mat4(np.dot(l._v, self._v))
 
 
 	def flatten(self):
-		return [e for row in self._v for e in row]
+		return self._v.flatten()
 
 	def row(self, i):
 		return list(self._v[i])
 
 	def __iter__(self):
-		return iter(self.flatten())
+		return iter(self.f_v)
 
 	def __getitem__(self, i):
-		return self._v[i//4][i%4]
+		return self._v[i//4, i%4]
 
 	def __str__(self):
 		"""'Pretty' formatting of the Mat4."""
@@ -431,8 +368,10 @@ class quat(object):
 	"""docstring for quat"""
 	def __init__(self, arg):
 		super(quat, self).__init__()
-		w, x, y, z = arg
-		self._v = (w, x, y, z)
+		if isinstance(arg, quat):
+			self._v = arg._v
+		else :
+			self._v = np.array(arg)
 	
 	@staticmethod
 	def axisangle(axis, angle):
@@ -445,7 +384,7 @@ class quat(object):
 		return quat([w, x, y, z])
 
 	def conjugate(self):
-		return quat(self[0], -self[1], -self[2], -self[3])
+		return quat(self._v[0], -self._v[1], -self._v[2], -self._v[3])
 
 	def norm(self):
 		return sqrt(self[0]**2 + self[1]**2 + self[2]**2)
@@ -462,13 +401,13 @@ class quat(object):
 
 	def __getattr__(self, attr):
 		if attr is 'w':
-			return self[0]
+			return self._v[0]
 		if attr is 'x':
-			return self[1]
+			return self._v[1]
 		if attr is 'y':
-			return self[2]
+			return self._v[2]
 		if attr is 'z':
-			return self[3]
+			return self._v[3]
 
 		raise AttributeError("%r object has no attribute %r" % (self.__class__, attr))
 
@@ -484,7 +423,7 @@ class sphere(object):
 	"""docstring for sphere"""
 	def __init__(self, pos, rad):
 		super(sphere, self).__init__()
-		self.center = vec3(pos)
+		self.center = pos
 		self.radius = rad
 
 	def ray_intersection(self, (o, d)):
@@ -525,7 +464,7 @@ class sphere(object):
 		return "(" + str(self.center) + ", " + str(self.radius) + ")"
 
 	def __repr__(self):
-		return "sphere(" + self.center + ", r=" + str(self.radius) + ")"
+		return "sphere(" + str(self.center) + ", r=" + str(self.radius) + ")"
 
 
 def _format_number(n, accuracy=6):

@@ -306,7 +306,7 @@ class Ship(object):
 			move = vec3([dx, dy, 0])
 
 			if move.mag() != 0:
-				move = move.unit() * 1.0 # parameterize screen move speed
+				move = move.unit().scale(1.0) # parameterize screen move speed
 				nx = self.position.x + move.x
 				ny = self.position.y + move.y
 				self.position = vec3([nx, ny, self.position.z])
@@ -416,7 +416,7 @@ class AsteroidField(object):
 			self.asteroid_slice_list.append(AsteroidSlice(self.asteroid_sphere_list, min_b, max_b))
 			self.last_slice_distance = min_b.z
 
-			print "AST COUNT", len([a for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids()])
+			# print "AST COUNT", len([a for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids()])
 
 		# Update the astroids slices
 		# 
@@ -507,7 +507,7 @@ class AsteroidSlice(object):
 		for i in range(int(num_ast)):
 			p = vec3([random(), random(), random()]).mul(self.size) + self.min_b
 			if random() > 0.5:
-				r = vec3.random() * random() * math.pi * 0.02
+				r = vec3.random().scale( random() * math.pi * 0.02)
 				s = random() * 4 + 0.1
 				n = randrange(1, 6)
 				a = Asteroid(p, rot=r, size=s, ast_num=n)
