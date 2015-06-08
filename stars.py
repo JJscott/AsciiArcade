@@ -20,6 +20,8 @@ from pygame.locals import *
 # 
 from GL_assets import *
 from collections import defaultdict
+import pygame
+
 
 
 
@@ -257,6 +259,12 @@ class Ship(object):
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
+		pygame.init()
+		self.joystick_count = pygame.joystick.get_count()
+		for i in range(self.joystick_count):
+			self.joystick = pygame.joystick.Joystick(i)
+			self.joystick.init()
+		
 	
 	def get_position(self):
 		return self.position
@@ -297,16 +305,33 @@ class Ship(object):
 			#
 			dx = 0
 			dy = 0
-
+			if(self.joystick_count == 0):
+				Xaxis = 0
+				Yaxis = 0
+				firebutton = 0
+			else:
+				Xaxis = self.joystick.get_axis( 0 )
+				Yaxis = self.joystick.get_axis( 1 )
+				firebutton = self.joystick.get_button( 0 )
+			
+			#print 'Xaxis: ', Xaxis
+			#print 'Yaxis: ', Yaxis
+			
+			dx += Xaxis
+			dy += Yaxis
+			
 			if pressed[K_LEFT]:		dx -= 1.0
 			if pressed[K_RIGHT]:	dx += 1.0
 			if pressed[K_UP]:		dy += 1.0
 			if pressed[K_DOWN]:		dy -= 1.0
-
+			
 			move = vec3([dx, dy, 0])
 
-			if move.mag() != 0:
-				move = move.unit() * 1.0 # parameterize screen move speed
+			if move.mag() > 0.01:
+				if(self.joystick_count == 0):
+					move = move.unit() * 1.0 # parameterize screen move speed
+				else:
+					move = move.unit() * max(abs(Xaxis), abs(Yaxis)) * 1.0 # parameterize screen move speed
 				nx = self.position.x + move.x
 				ny = self.position.y + move.y
 				self.position = vec3([nx, ny, self.position.z])
@@ -332,7 +357,7 @@ class Ship(object):
 
 			# Update Bullets"
 			#
-			if pressed[K_SPACE]:
+			if (pressed[K_SPACE]) or (firebutton==1):
 				if not self.fired and self.cooldown <= 0:
 					scene["bullet_collection"].add_bullet(self.position + vec3([0.5, 0, 0]), self.speed )
 					scene["bullet_collection"].add_bullet(self.position - vec3([0.5, 0, 0]), self.speed )
