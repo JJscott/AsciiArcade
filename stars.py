@@ -21,23 +21,29 @@ from pygame.locals import *
 from GL_assets import *
 from collections import defaultdict
 
+# fuck it
+gl = None
 
 
 class StarsGame(object):
 	"""StarsGame"""
-	def __init__(self, gl):
+	def __init__(self, gl_):
 		super(StarsGame, self).__init__()
-
+		
+		# now everything has GL
+		global gl
+		gl = gl_
+		
 		self.assets = GL_assets()
 
 		# Load geometry
 		# 
 		self.assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
-		self.assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
+		self.assets.load_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
+		self.assets.load_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
+		self.assets.load_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
+		self.assets.load_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
+		self.assets.load_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
 		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/SHIP.obj")
 		self.assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
 
@@ -91,7 +97,7 @@ class StarsGame(object):
 
 		# Create view and projection matrix
 		#
-		proj = mat4.perspectiveProjection(math.pi / 2, float(w)/h, znear, zfar)
+		proj = mat4.perspectiveProjection(math.pi / 3, float(w)/h, znear, zfar)
 		view = self.scene["ship"].get_view_matrix()
 
 		# Render all objects in the scene
@@ -393,7 +399,8 @@ class AsteroidField(object):
 
 		self.next_slice_distance = 200 # How far away the next chunk should be generated
 		self.last_slice_distance = -100 # The last min of the chunk
-
+		
+		self.vbo_ast_id = GLuint(0)
 			
 	def update(self, scene, pressed):
 		
@@ -428,22 +435,39 @@ class AsteroidField(object):
 		prog = assets.get_shader(tag="asteroid")
 		gl.glUseProgram(prog)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
-
-
-		model = mat4.scale(2,2,2)
-
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "viewMatrix"), 1, True, pygloo.c_array(GLfloat, view.flatten()))
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, Asteroid._tex_pos)
+		gl.glActiveTexture(GL_TEXTURE1)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, Asteroid._tex_ori)
+		gl.glActiveTexture(GL_TEXTURE2)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, Asteroid._tex_rot)
+		
+		gl.glUniform1i(gl.glGetUniformLocation(prog, 'sampler_ast_pos'), 0)
+		gl.glUniform1i(gl.glGetUniformLocation(prog, 'sampler_ast_ori'), 1)
+		gl.glUniform1i(gl.glGetUniformLocation(prog, 'sampler_ast_rot'), 2)
+		
+		if not self.vbo_ast_id.value:
+			gl.glGenBuffers(1, self.vbo_ast_id)
+		# }
+		
 		for i in xrange(1, 6):
 
 			# Retreive model and shader, Load geometry once
 			#
 			vao, vao_size = assets.get_geometry(tag="asteroid{num}".format(num=i))
-			inst_vbo = assets.get_inst_vbo(tag="asteroid{num}".format(num=i))
+			#inst_vbo = assets.get_inst_vbo(tag="asteroid{num}".format(num=i))
 			gl.glBindVertexArray(vao)
-
+			
+			gl.glBindBuffer(GL_ARRAY_BUFFER, self.vbo_ast_id)
+			gl.glVertexAttribIPointer(3, 1, GL_INT, 0, None)
+			gl.glEnableVertexAttribArray(3)
+			gl.glVertexAttribDivisor(3, 1)
+			
 			# Create buffer
 			# 
-			mv_array = []
-
+			id_array = []
 
 			# Create the instance data
 			# 
@@ -452,19 +476,21 @@ class AsteroidField(object):
 
 				# Set up matricies
 				#
-				rotation = mat4.rotateFromQuat(a.orientation)
-				scale = mat4.scale(a.size,a.size,a.size)
-				position = mat4.translate(a.position.x, a.position.y, a.position.z)
-				mv = (view * position * rotation * scale * model).transpose()
-				mv_array.extend(mv.flatten())
+				#rotation = mat4.rotateFromQuat(a.orientation)
+				#scale = mat4.scale(a.size,a.size,a.size)
+				#position = mat4.translate(a.position.x, a.position.y, a.position.z)
+				#mv = (view * position * rotation * scale * model).transpose()
+				#mv_array.extend(mv.flatten())
+				
+				id_array.append(a.id)
+				
 				count += 1
 
 
 			# Upload the instace data
 			# 
-			mv_c_array = pygloo.c_array(GLfloat, mv_array)
-			gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
-			gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
+			id_c_array = pygloo.c_array(GLint, id_array)
+			gl.glBufferData( GL_ARRAY_BUFFER, sizeof(id_c_array), id_c_array, GL_STREAM_DRAW )
 
 			# Render
 			# 	
@@ -532,16 +558,69 @@ class AsteroidSlice(object):
 
 
 class Asteroid(object):
+	import Queue
+	
+	ID_LIMIT = 5000
+	
+	_idpool = Queue.Queue()
+	for i in xrange(ID_LIMIT): _idpool.put(i)
+	
+	_buf_pos = GLuint(0)
+	_buf_ori = GLuint(0)
+	_buf_rot = GLuint(0)
+	
+	_tex_pos = GLuint(0)
+	_tex_ori = GLuint(0)
+	_tex_rot = GLuint(0)
+	
+	@classmethod
+	def _init_things(cls):
+		if cls._buf_pos.value: return
+		
+		gl.glGenBuffers(1, cls._buf_pos)
+		gl.glGenBuffers(1, cls._buf_ori)
+		gl.glGenBuffers(1, cls._buf_rot)
+		
+		gl.glGenTextures(1, cls._tex_pos)
+		gl.glGenTextures(1, cls._tex_ori)
+		gl.glGenTextures(1, cls._tex_rot)
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, cls._buf_pos)
+		gl.glBufferData(GL_ARRAY_BUFFER, cls.ID_LIMIT * 4 * sizeof(GLfloat), None, GL_DYNAMIC_DRAW)
+		gl.glBindBuffer(GL_ARRAY_BUFFER, cls._buf_ori)
+		gl.glBufferData(GL_ARRAY_BUFFER, cls.ID_LIMIT * 4 * sizeof(GLfloat), None, GL_DYNAMIC_DRAW)
+		gl.glBindBuffer(GL_ARRAY_BUFFER, cls._buf_rot)
+		gl.glBufferData(GL_ARRAY_BUFFER, cls.ID_LIMIT * 4 * sizeof(GLfloat), None, GL_DYNAMIC_DRAW)
+		
+		gl.glActiveTexture(GL_TEXTURE0)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, cls._tex_pos)
+		gl.glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, cls._buf_pos)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, cls._tex_ori)
+		gl.glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, cls._buf_ori)
+		gl.glBindTexture(GL_TEXTURE_BUFFER, cls._tex_rot)
+		gl.glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, cls._buf_rot)
+	# }
+	
 	"""docstring for Asteroid"""
 	def __init__(self, pos, rot=(0,0,0), size=1, ast_num=1):
 		super(Asteroid, self).__init__()
+		Asteroid._init_things()
+		self.id = Asteroid._idpool.get()
 		self.position = vec3(pos) 
 		self.rotation = vec3(rot)
 		self.orientation = quat.axisangle(vec3.random(), 2 * math.pi * random()).unit()
 		self.size = size
 		self.ast_num = ast_num
-
+		
 		self.sph = sphere([0,0,0],0)
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, Asteroid._buf_pos)
+		gl.glBufferSubData(GL_ARRAY_BUFFER, self.id * 4 * sizeof(GLfloat), 4 * sizeof(GLfloat), c_array(GLfloat, [x for x in self.position] + [self.size]))
+		gl.glBindBuffer(GL_ARRAY_BUFFER, Asteroid._buf_ori)
+		gl.glBufferSubData(GL_ARRAY_BUFFER, self.id * 4 * sizeof(GLfloat), 4 * sizeof(GLfloat), c_array(GLfloat, [x for x in self.orientation]))
+		gl.glBindBuffer(GL_ARRAY_BUFFER, Asteroid._buf_rot)
+		gl.glBufferSubData(GL_ARRAY_BUFFER, self.id * 4 * sizeof(GLfloat), 4 * sizeof(GLfloat), c_array(GLfloat, [x for x in self.rotation] + [0]))
+		gl.glBindBuffer(GL_ARRAY_BUFFER, 0)
 	
 	def update(self, scene, pressed):
 		if (self.rotation.mag() > 0):
@@ -551,4 +630,6 @@ class Asteroid(object):
 	def get_sphere(self):
 		return sphere(self.sph.center + self.position, self.sph.radius * self.size * 1.5) #TODO change radius of asteroid
 	
+	def __del__(self):
+		Asteroid._idpool.put(self.id)
 	
