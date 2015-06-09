@@ -89,7 +89,7 @@ class GameState(object):
 			obj.draw(gl, proj, view)
 
 
-		if self.scene["ship"].dead:
+		if self.scene["ship"].dead and ascii_r:
 			art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
 
 			# temp
@@ -187,7 +187,7 @@ class BulletCollection(object):
 		# Create and buffer the instance data
 		# 
 		mv_array = []
-		model = mat4.scale(0.25,0.25,0.25)
+		model = mat4.scale(0.5,0.5,0.5)
 
 		for b in self.bullet_list:
 			# Set up matricies
@@ -205,8 +205,8 @@ class BulletCollection(object):
 		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.bullet_list))
 
 
-	def add_bullet(self, position, speed):
-		self.bullet_list.append(Bullet(position, speed))
+	def add_bullet(self, position, vel):
+		self.bullet_list.append(Bullet(position, vel))
 
 	def get_sphere_list(self):
 		# Need t return a generator for all the asteroids
@@ -214,11 +214,11 @@ class BulletCollection(object):
 
 class Bullet(object):
 	"""docstring for Bullet"""
-	def __init__(self, pos, ship_speed):
+	def __init__(self, pos, vel):
 		super(Bullet, self).__init__()
 		self.position = pos
-		self.speed = 5 * ship_speed
-		self.power = 60				# Live for 500 "ticks"
+		self.velocity = vel.scale(3)
+		self.power = 60				# Live for 60 "ticks"
 	
 	def get_position(self):
 		return self.position
@@ -227,7 +227,7 @@ class Bullet(object):
 		return sphere(self.position, 0.25)
 	
 	def update(self, scene, pressed):
-		self.position = self.position + vec3([0, 0, self.speed])
+		self.position = self.position + self.velocity
 		self.power -= 1
 
 
@@ -247,8 +247,9 @@ class Ship(object):
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
-		self.orientation = vec3([0,0,0])
-		self.speed = -2.0
+		self.euler_rotation = vec3([0,0,0])
+		self.forward_speed = -2.0
+		self.side_speed = 1.0
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
@@ -265,9 +266,6 @@ class Ship(object):
 	def get_view_matrix(self):
 		cam_pos = vec3([0, 0, 6])
 		cam_Xrot = -math.pi / 9
-		# cam_Xrot = -math.pi / 6
-		# cam_Xrot = -math.pi / 3
-		# ship_pos =  vec3([0, 0, self.position.z])
 		ship_pos = vec3([self.position.x, self.position.y, self.position.z])
 		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
 			mat4.rotateX(cam_Xrot) *
@@ -278,77 +276,72 @@ class Ship(object):
 	def get_sphere_list(self):
 		all_spheres = [sphere(self.position + vec3([0, 0, -1.0]), 0.5)]
 		wing_offset = [ 
-			(0.5, 0, 0),
-			(1.3, 0, 0.2),
-			(1.8, 0, 0.5) ]
+			vec4([0.5, 0, 0, 1]),
+			vec4([1.3, 0, 0.2, 1]),
+			vec4([1.8, 0, 0.5, 1]) ]
 		wing_radii = [0.6, 0.3, 0.2]
 
 		pos = mat4.translate(self.position.x, self.position.y, self.position.z)
+		rot = self.get_orientation_matrix()
+		comb = pos * rot
+		flip = mat4.scale(-1,-1, 1)
 
-		all_spheres.extend( [ sphere(pos.multiply_vec4(vec4([ x, y, z, 1])).xyz, r) for ((x, y, z),r) in zip(wing_offset, wing_radii) ] ) # Right wing
-		all_spheres.extend( [ sphere(pos.multiply_vec4(vec4([-x, y, z, 1])).xyz, r) for ((x, y, z),r) in zip(wing_offset, wing_radii) ] ) # Left wing
+		all_spheres.extend( [ sphere(comb.multiply_vec4(v).xyz, r) for (v,r) in zip(wing_offset, wing_radii) ] ) # Right wing
+		all_spheres.extend( [ sphere((comb * flip).multiply_vec4(v).xyz, r) for (v,r) in zip(wing_offset, wing_radii) ] ) # Left wing
 
 		return all_spheres
+
+	def get_orientation_matrix(self):
+		return mat4.rotateX(self.euler_rotation.x) * mat4.rotateZ(self.euler_rotation.z)
 	
 		
 	def update(self, scene, pressed):
 
 		if not self.dead:
-			# Update position
-			#
+
 			dx = 0
 			dy = 0
-			if(self.joystick_count == 0):
-				Xaxis = 0
-				Yaxis = 0
-				firebutton = 0
-			else:
-				Xaxis = self.joystick.get_axis( 0 )
-				Yaxis = self.joystick.get_axis( 1 )
+			firebutton = False
+
+			# Controls for Joystick
+			#
+			if self.joystick_count:
+				dx = self.joystick.get_axis( 0 )
+				dy = self.joystick.get_axis( 1 )
 				firebutton = self.joystick.get_button( 0 )
-			
-			#print 'Xaxis: ', Xaxis
-			#print 'Yaxis: ', Yaxis
-			
-			dx += Xaxis
-			dy += Yaxis
-			
-			if pressed[K_LEFT]:		dx -= 1.0
-			if pressed[K_RIGHT]:	dx += 1.0
-			if pressed[K_UP]:		dy += 1.0
-			if pressed[K_DOWN]:		dy -= 1.0
-			
-			if(Xaxis <= -0.01) or (pressed[K_LEFT]):
-				self.orientation.z = abs(Xaxis) * math.pi/8
-			
-			if(Xaxis >= 0.01) or (pressed[K_RIGHT]):
-				self.orientation.z = abs(Xaxis) * -math.pi/8
-			
-			if(Yaxis <= -0.01) or (pressed[K_DOWN]):
-				self.orientation.x = abs(Yaxis) * -math.pi/8
-			
-			if(Yaxis >= 0.01) or (pressed[K_UP]):
-				self.orientation.x = abs(Yaxis) * +math.pi/8
+
+			# Controls for keyboard
+			# 
+			if pressed[K_LEFT] and not pressed[K_RIGHT] :	dx = -1.0
+			if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
+			if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
+			if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
+			firebutton = firebutton or pressed[K_SPACE]
+
+
+
+			# Update side position
+			#
 			move = vec3([dx, dy, 0])
 			
-			if move.mag() < 0.01:
-				self.orientation.x = 0
-				self.orientation.y = 0
-				self.orientation.z = 0
+			# Update euler_rotation
+			if abs(dx) >= 0.01 : self.euler_rotation.z = -dx * math.pi/8
+			if abs(dy) >= 0.01 : self.euler_rotation.x = dy * math.pi/8
 
-			if move.mag() > 0.01:
-				if(self.joystick_count == 0):
-					move = move.unit().scale(1.0) # parameterize screen move speed
-				else:
-					move = move.unit().scale(max(abs(Xaxis), abs(Yaxis)) * 1.0) # parameterize screen move speed
-				nx = self.position.x + move.x
-				ny = self.position.y + move.y
-				self.position = vec3([nx, ny, self.position.z])
+			move_mag = move.mag()
+			if move_mag < 0.01:
+				self.euler_rotation.x = 0
+				self.euler_rotation.z = 0
+			else:
+				if move_mag > 1.0:
+					move = move.scale(1/move_mag)
+				self.position = self.position + move
 			
 
-			# Move foward
+			# Update foward position
 			#
-			self.position = self.position + vec3([0, 0, self.speed])
+			forward = vec3([0, 0, self.forward_speed])
+			self.position = self.position + forward
 
 
 			# Colision detection
@@ -359,16 +352,16 @@ class Ship(object):
 				self.dead = True
 				return
 
-			# if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in [a for a in scene["asteroid_field"].get_sphere_list()] if ship_broad_sphere.sphere_intersection(a) <=0 ):
-			# 	self.dead = True
-				# pass
 
-			# Update Bullets"
+			# Update Bullets
 			#
-			if (pressed[K_SPACE]) or (firebutton==1):
+			if firebutton == 1:
 				if not self.fired and self.cooldown <= 0:
-					scene["bullet_collection"].add_bullet(self.position + vec3([0.5, 0, 0]), self.speed )
-					scene["bullet_collection"].add_bullet(self.position - vec3([0.5, 0, 0]), self.speed )
+					rotate = self.get_orientation_matrix()
+					vel = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit().scale((move + forward).mag())
+					bullet_offset = rotate.multiply_vec4(vec4([0.5,0,0,0])).xyz
+					scene["bullet_collection"].add_bullet(self.position + bullet_offset, vel )
+					scene["bullet_collection"].add_bullet(self.position - bullet_offset, vel )
 					self.cooldown = 5
 				self.fired = True
 			else:
@@ -381,12 +374,9 @@ class Ship(object):
 		# Set up matricies
 		#
 		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
+		rotation = self.get_orientation_matrix()
 		position = mat4.translate(self.position.x, self.position.y, self.position.z)
-		#rotation = mat4.rotate(self.orientation.x, self.orientation.y, self.orientation.z)
-		rotateX = mat4.rotateX(self.orientation.x)
-		rotateY = mat4.rotateY(0)
-		rotateZ = mat4.rotateZ(self.orientation.z)
-		mv = view * position * rotateX * rotateY * rotateZ * model
+		mv = view * position * rotation * model
 
 		# Retreive model and shader
 		#
@@ -402,6 +392,7 @@ class Ship(object):
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
 		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+
 
 
 
