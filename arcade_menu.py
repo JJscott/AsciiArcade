@@ -6,6 +6,7 @@ from pygame.locals import *
 
 import ascii
 import game
+import highscore
 from vec import *
 import math
 
@@ -36,6 +37,9 @@ class ArcadeMenuState(object):
 		if self.pause > 50:
 			if pressed[K_SPACE]:
 				return game.GameState()
+
+			if pressed[K_h]:
+				return highscore.HighScoreState()
 
 
 	# Render logic
