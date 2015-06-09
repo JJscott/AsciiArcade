@@ -255,6 +255,7 @@ class Ship(object):
 	def __init__(self):
 		super(Ship, self).__init__()
 		self.position = vec3([0, 0, 0])
+		self.orientation = vec3([0,0,0])
 		self.speed = -2.0
 		self.dead = False
 		self.fired = False
@@ -325,7 +326,23 @@ class Ship(object):
 			if pressed[K_UP]:		dy += 1.0
 			if pressed[K_DOWN]:		dy -= 1.0
 			
+			if(Xaxis <= -0.01) or (pressed[K_LEFT]):
+				self.orientation.z = abs(Xaxis) * math.pi/8
+			
+			if(Xaxis >= 0.01) or (pressed[K_RIGHT]):
+				self.orientation.z = abs(Xaxis) * -math.pi/8
+			
+			if(Yaxis <= -0.01) or (pressed[K_DOWN]):
+				self.orientation.x = abs(Yaxis) * -math.pi/8
+			
+			if(Yaxis >= 0.01) or (pressed[K_UP]):
+				self.orientation.x = abs(Yaxis) * +math.pi/8
 			move = vec3([dx, dy, 0])
+			
+			if move.mag() < 0.01:
+				self.orientation.x = 0
+				self.orientation.y = 0
+				self.orientation.z = 0
 
 			if move.mag() > 0.01:
 				if(self.joystick_count == 0):
@@ -373,7 +390,11 @@ class Ship(object):
 		#
 		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
 		position = mat4.translate(self.position.x, self.position.y, self.position.z)
-		mv = view * position * model
+		#rotation = mat4.rotate(self.orientation.x, self.orientation.y, self.orientation.z)
+		rotateX = mat4.rotateX(self.orientation.x)
+		rotateY = mat4.rotateY(0)
+		rotateZ = mat4.rotateZ(self.orientation.z)
+		mv = view * position * rotateX * rotateY * rotateZ * model
 
 		# Retreive model and shader
 		#
