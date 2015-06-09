@@ -3064,7 +3064,7 @@ class TextArea(object):
 		''' Insert text at cursor position. '''
 		i = self._safe_cursor()
 		self.text = self.text[:i] + text + self.text[i:]
-		self.cursor = i + len(text) if advance else 0
+		self.cursor = i + (len(text) if advance else 0)
 		self.blink = False
 		self.blinkwait = 0
 		self.invalidate()
