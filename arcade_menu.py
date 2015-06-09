@@ -70,6 +70,7 @@ class ArcadeMenuState(object):
 			ascii_r.draw_text(art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
 
 			ascii_r.draw_text("Pres Start", color = (1, 1, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
+		return proj
 		
 
 
