@@ -16,42 +16,28 @@ from random import randrange, random
 # 
 from pygame.locals import *
 
+# State stuff
+# 
+from highscore import HighScoreState
+
 # Other stuff
 # 
 from GL_assets import *
 from collections import defaultdict
 import pygame
+import ascii
 
 
+##
+##
+Assets = GL_assets()
 
 
-class StarsGame(object):
-	"""StarsGame"""
-	def __init__(self, gl):
-		super(StarsGame, self).__init__()
-
-		self.assets = GL_assets()
-
-		# Load geometry
-		# 
-		self.assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
-		self.assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
-		self.assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
-		self.assets.load_geometry(gl, 		"ship",			"Assets/Ship/SHIP.obj")
-		self.assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
-
-		# Load shader
-		# 
-		self.assets.load_shader(gl, "bullet",	open("Assets/Shaders/bullet_shader.glsl").read())
-		self.assets.load_shader(gl, "asteroid",	open("Assets/Shaders/asteroid_shader.glsl").read())
-		self.assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
-		self.assets.load_shader(gl, "sphere",	open("Assets/Shaders/red_sphere_shader.glsl").read())
-
+class GameState(object):
+	"""GameState"""
+	def __init__(self):
+		super(GameState, self).__init__()
 		self.reset()
-
 		self.show_spheres = False
 			
 
@@ -59,7 +45,7 @@ class StarsGame(object):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["ship"] = Ship()
-		self.scene["asteroid_field"] = AsteroidField(self.assets)
+		self.scene["asteroid_field"] = AsteroidField()
 	
 
 	# Game logic
@@ -82,12 +68,13 @@ class StarsGame(object):
 		if self.scene["ship"].dead:
 			#HACKY HACKY RESET
 			if pressed[K_SPACE]:
-				self.reset()
+				return HighScoreState()
+				# self.reset()
 						
 
 	# Render logic
 	#
-	def render(self, gl, w, h):
+	def render(self, gl, w, h, ascii_r=None):
 		zfar = 1000
 		znear = 0.1
 
@@ -99,7 +86,15 @@ class StarsGame(object):
 		# Render all objects in the scene
 		# 
 		for (_, obj) in self.scene.items():
-			obj.draw(gl, self.assets, proj, view)
+			obj.draw(gl, proj, view)
+
+
+		if self.scene["ship"].dead:
+			art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
+
+			# temp
+			ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+			
 
 
 		# Debug colliding spheres
@@ -114,9 +109,9 @@ class StarsGame(object):
 
 				# Retreive model and shader
 				#
-				vao, vao_size = self.assets.get_geometry(tag="sphere")
-				inst_vbo = self.assets.get_inst_vbo(tag="sphere")
-				prog = self.assets.get_shader(tag="sphere")
+				vao, vao_size = Assets.get_geometry(tag="sphere")
+				inst_vbo = Assets.get_inst_vbo(tag="sphere")
+				prog = Assets.get_shader(tag="sphere")
 
 				# Load geometry, shader and projection once
 				#
@@ -149,16 +144,13 @@ class StarsGame(object):
 				
 		# ascii needs proj matrix
 		return proj
-			
-	# TODO in Future
-	#
-	def render_GUI():
-		pass
-	
-	# TODO in Future
-	#
-	def render_GUI_ascii():
-		pass
+
+
+
+
+
+
+
 
 
 
@@ -179,12 +171,12 @@ class BulletCollection(object):
 			b.update(scene, pressed)
 			
 
-	def draw(self, gl, assets, proj, view):
+	def draw(self, gl, proj, view):
 		# Retreive model and shader
 		#
-		vao, vao_size = assets.get_geometry(tag="bullet")
-		inst_vbo = assets.get_inst_vbo(tag="bullet")
-		prog = assets.get_shader(tag="bullet")
+		vao, vao_size = Assets.get_geometry(tag="bullet")
+		inst_vbo = Assets.get_inst_vbo(tag="bullet")
+		prog = Assets.get_shader(tag="bullet")
 
 		# Load geometry, shader and projection once
 		#
@@ -368,7 +360,7 @@ class Ship(object):
 
 
 
-	def draw(self, gl, assets, proj, view):
+	def draw(self, gl, proj, view):
 		# Set up matricies
 		#
 		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
@@ -377,8 +369,8 @@ class Ship(object):
 
 		# Retreive model and shader
 		#
-		vao, vao_size = assets.get_geometry(tag="ship")
-		prog = assets.get_shader(tag="ship")
+		vao, vao_size = Assets.get_geometry(tag="ship")
+		prog = Assets.get_shader(tag="ship")
 
 		# Render
 		# 
@@ -408,12 +400,12 @@ class Ship(object):
 class AsteroidField(object):
 
 	"""docstring for AsteroidField"""
-	def __init__(self, assets):
+	def __init__(self):
 		super(AsteroidField, self).__init__()
 		self.asteroid_slice_list = []
 		self.asteroid_sphere_list = {}
 		for i in xrange(1,6):
-			self.asteroid_sphere_list[i] = assets.get_geometry_sphere(tag="asteroid{num}".format(num=i))
+			self.asteroid_sphere_list[i] = Assets.get_geometry_sphere(tag="asteroid{num}".format(num=i))
 
 		self.next_slice_distance = 200 # How far away the next chunk should be generated
 		self.last_slice_distance = -100 # The last min of the chunk
@@ -448,8 +440,8 @@ class AsteroidField(object):
 		# 	a.update(scene, pressed)
 	
 
-	def draw(self, gl, assets, proj, view):
-		prog = assets.get_shader(tag="asteroid")
+	def draw(self, gl, proj, view):
+		prog = Assets.get_shader(tag="asteroid")
 		gl.glUseProgram(prog)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
@@ -460,8 +452,8 @@ class AsteroidField(object):
 
 			# Retreive model and shader, Load geometry once
 			#
-			vao, vao_size = assets.get_geometry(tag="asteroid{num}".format(num=i))
-			inst_vbo = assets.get_inst_vbo(tag="asteroid{num}".format(num=i))
+			vao, vao_size = Assets.get_geometry(tag="asteroid{num}".format(num=i))
+			inst_vbo = Assets.get_inst_vbo(tag="asteroid{num}".format(num=i))
 			gl.glBindVertexArray(vao)
 
 			# Create buffer
@@ -576,3 +568,27 @@ class Asteroid(object):
 		return sphere(self.sph.center + self.position, self.sph.radius * self.size * 1.5) #TODO change radius of asteroid
 	
 	
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Utility
+# 
+
+# class Timer(object):
+# 	"""docstring for Timer"""
+# 	def __init__(self, arg):
+# 		super(Timer, self).__init__()
+# 		self.arg = arg
+
+# 	def update(self, scene, pressed):
+		

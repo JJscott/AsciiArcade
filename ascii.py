@@ -5,6 +5,7 @@ import pygame
 import ctypes
 import itertools
 import math
+import vec
 from pygloo import *
 from simpleShader import makeProgram
 
@@ -2578,12 +2579,13 @@ class AsciiRenderer:
 	def render(self, w, h, game, _cache = {}):
 		gl = self.gl
 		
-		art1 = wordart('ASCII', 'big')
-		art2 = wordart('ARCADE', 'big')
+		# art1 = wordart('ASCII', 'big')
+		# art2 = wordart('ARCADE', 'big')
 		
-		# temp
-		self.draw_text(art1, color = (0.333, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
-		self.draw_text(art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
+		# # temp
+		# self.draw_text(art1, color = (0.333, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
+		# self.draw_text(art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
+
 		
 		if (w, h) == (0, 0): return
 		
@@ -2598,7 +2600,8 @@ class AsciiRenderer:
 		gl.glDepthFunc(GL_LESS)
 		gl.glViewport(0, 0, *self._img_size)
 		
-		proj = game.render(gl, *self._img_size)
+		proj = game.render(gl, *self._img_size, ascii_r=self)
+	 	if not proj: proj = vec.mat4.identity()
 		
 		gl.glDisable(GL_DEPTH_TEST)
 		

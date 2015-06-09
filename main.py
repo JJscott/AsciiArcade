@@ -20,7 +20,8 @@ import math
 
 # The actual game
 #
-import stars
+import game as ArcadeGame
+from arcade_menu import ArcadeMenuState
 import ascii
 
 asciirenderer = None
@@ -67,10 +68,29 @@ def run():
 
 	global gl
 	gl = pygloo.init()
+	# gl._begin = True
+
+	# Load geometry
+	# 
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
+	ArcadeGame.Assets.load_geometry(gl, 		"ship",			"Assets/Ship/SHIP.obj")
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
+
+	# Load shader
+	# 
+	ArcadeGame.Assets.load_shader(gl, "bullet",	open("Assets/Shaders/bullet_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "asteroid",	open("Assets/Shaders/asteroid_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "sphere",	open("Assets/Shaders/red_sphere_shader.glsl").read())
 
 	global game
-	game = stars.StarsGame(gl)
-	
+	game = ArcadeMenuState()
+
 	global asciirenderer
 	asciirenderer = ascii.AsciiRenderer(gl)
 	
@@ -99,7 +119,8 @@ def run():
 		# Get key presses and update
 		# 
 		pressed = pygame.key.get_pressed()
-		game.tick(pressed)
+		ngame = game.tick(pressed)
+		if ngame: game = ngame
 		
 		
 		# Render
