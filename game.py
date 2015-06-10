@@ -459,11 +459,15 @@ class EnemyShip(object):
 		self.acceleration = vec3([0.15, 0.15, 0])
 		self.dampening = 0.01
 
+		self.x_period = 132.0
+		self.y_period = 233.0
+
 		# Feilds
-		self.position = vec3([0, 0, -10])
+		self.position = vec3([0, 0, -50])
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
 		self.dead = False
+		self.tick_time = 0
 
 		
 	
@@ -564,7 +568,11 @@ class EnemyShip(object):
 			# Carry on with current course (with slight modifications)
 			#
 			else :
-				pass
+				controls = vec3 ([
+				math.sin((2*math.pi) * (self.tick_time / self.x_period) ) * 0.1,
+				math.sin((2*math.pi) * (self.tick_time / self.y_period) ) * 0.1,
+				-1
+				])
 
 			# Apply dampening effect
 			# 
@@ -596,6 +604,7 @@ class EnemyShip(object):
 			# #
 			# forward = vec3([0, 0, self.forward_speed])
 			self.position = self.position + self.velocity
+			self.tick_time += 1
 
 
 
