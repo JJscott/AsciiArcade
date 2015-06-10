@@ -113,8 +113,8 @@ class DummyShip(object):
 		x_period = 1000.0
 		y_period = 1333.0
 
-		x = 50 * math.sin((2*math.pi) * (self.x_time / x_period) )
-		y = 50 * math.sin((2*math.pi) * (self.y_time / y_period) )
+		x = 50 * math.cos((2*math.pi) * (self.x_time / x_period) )
+		y = 50 * math.cos((2*math.pi) * (self.y_time / y_period) )
 
 		self.position = vec3([x, y, self.position.z-1])
 

@@ -78,7 +78,10 @@ def run():
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid4",	"Assets/Asteroids/Asteroid4.obj", center=True)
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid5",	"Assets/Asteroids/Asteroid5.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid6",	"Assets/Asteroids/Asteroid6.obj", center=True)
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid7",	"Assets/Asteroids/Asteroid7.obj", center=True)
 	ArcadeGame.Assets.load_geometry(gl, 		"ship",			"Assets/Ship/SHIP.obj")
+	ArcadeGame.Assets.load_geometry(gl, 		"enemyship",	"Assets/EnemyShip/EnemyShip.obj")
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"sphere",		"Assets/Debug/Sphere/sphere.obj")
 
 	# Load shader

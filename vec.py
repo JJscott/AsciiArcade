@@ -44,6 +44,10 @@ class vec3(object):
 	def random():
 		return vec3([random.random()-0.5,random.random()-0.5,random.random()-0.5]).unit()
 
+	@staticmethod
+	def clamp(target, min_v, max_v):
+		return vec3(map(lambda (x,l,h): max(min(x, h), l), zip(target._v, min_v._v, max_v._v)))
+
 	def add(self, v):
 		return vec3(self._v+v._v)
 
