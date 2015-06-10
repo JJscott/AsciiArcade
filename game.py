@@ -90,12 +90,22 @@ class GameState(object):
 		for (_, obj) in self.scene.items():
 			obj.draw(gl, proj, view)
 
+		if ascii_r:
+			if self.scene["ship"].dead:
+				art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
 
-		if self.scene["ship"].dead and ascii_r:
-			art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
+				# temp
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 
-			# temp
-			ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+			else:
+
+				# Retical for enemy ship
+				#
+				ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.scene["enemy_ship"].position, 1)).vec3()
+				ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+				print ship_ascii_pos
+				ascii_r.draw_text("X------X\n|      |\n\n|      |\n\n|      |\n\n|      |\nX------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
+
 			
 
 
@@ -311,8 +321,8 @@ class Ship(object):
 		return all_spheres
 
 	def get_orientation_matrix(self):
-		return mat4.rotateX(self.euler_rotation.x) * mat4.rotateZ(self.euler_rotation.z)
-
+		return mat4.rotateX(self.euler_rotation.x) * mat4.rotateY(self.euler_rotation.y) * mat4.rotateZ(self.euler_rotation.z)
+	
 	def apply_acceleration(self, accel):
 		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
 	
@@ -361,25 +371,23 @@ class Ship(object):
 
 
 			
-			# Update euler_rotation TODO update
-			if abs(dx) >= 0.01 : self.euler_rotation.z = -dx * math.pi/8
-			if abs(dy) >= 0.01 : self.euler_rotation.x = dy * math.pi/8
+			# Update euler_rotation
+			# 
+			# z_rot = 0
+			# y_rot = 0
+			# x_rot = 0
+			# if abs(dx) >= 0.01 : z_rot = -dx * math.pi/8; y_rot = -dx * math.pi/16
+			# if abs(dy) >= 0.01 : x_rot = dy * math.pi/8
+			# self.euler_rotation = vec3([x_rot, y_rot, z_rot])
 
-			# move_mag = move.mag()
-			# if move_mag < 0.01:
-			# 	self.euler_rotation.x = 0
-			# 	self.euler_rotation.z = 0
-			# else:
-			# 	if move_mag > 1.0:
-			# 		move = move.scale(1/move_mag)
-			# 	self.position = self.position + move
+			self.euler_rotation = vec3([
+				self.velocity.y * math.pi/8,
+				-self.velocity.x * math.pi/16,
+				-self.velocity.x * math.pi/8])
 			
-
 			# Update foward position
 			#
 			self.position = self.position + self.velocity
-			# forward = vec3([0, 0, self.max_forward_speed])
-			# self.position = self.position + forward
 
 
 			# Colision detection
@@ -492,7 +500,7 @@ class EnemyShip(object):
 		return all_spheres
 
 	def get_orientation_matrix(self):
-		return mat4.rotateX(self.euler_rotation.x) * mat4.rotateZ(self.euler_rotation.z)
+		return mat4.rotateX(self.euler_rotation.x) * mat4.rotateY(self.euler_rotation.y) * mat4.rotateZ(self.euler_rotation.z)
 	
 	def apply_acceleration(self, accel):
 		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
@@ -584,25 +592,23 @@ class EnemyShip(object):
 			self.apply_acceleration(move_accel)
 
 
+			# Update euler_rotation
+			# 
+			# z_rot = 0
+			# y_rot = 0
+			# x_rot = 0
+			# if abs(dx) >= 0.01 : z_rot = -dx * math.pi/8; y_rot = -dx * math.pi/16
+			# if abs(dy) >= 0.01 : x_rot = dy * math.pi/8
+			# self.euler_rotation = vec3([x_rot, y_rot, z_rot])
+
+			self.euler_rotation = vec3([
+				self.velocity.y * math.pi/8,
+				-self.velocity.x * math.pi/16,
+				-self.velocity.x * math.pi/8])
 
 
-			# # Update euler_rotation
-			# if abs(dx) >= 0.01 : self.euler_rotation.z = -dx * math.pi/8
-			# if abs(dy) >= 0.01 : self.euler_rotation.x = dy * math.pi/8
-
-			# move_mag = move.mag()
-			# if move_mag < 0.01:
-			# 	self.euler_rotation.x = 0
-			# 	self.euler_rotation.z = 0
-			# else:
-			# 	if move_mag > 1.0:
-			# 		move = move.scale(1/move_mag)
-			# 	self.position = self.position + move
-			
-
-			# # Update foward position
-			# #
-			# forward = vec3([0, 0, self.forward_speed])
+			# Update foward position
+			#
 			self.position = self.position + self.velocity
 			self.tick_time += 1
 

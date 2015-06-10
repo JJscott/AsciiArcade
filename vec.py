@@ -151,7 +151,7 @@ class vec4(object):
 
 	@staticmethod
 	def from_vec3(v, w):
-		return vec4(v[0], v[1], v[2], w)
+		return vec4([v[0], v[1], v[2], w])
 
 	def add(self, v):
 		return vec4(self._v+v._v)
@@ -176,6 +176,13 @@ class vec4(object):
 
 	def scale(self, s):
 		return vec4(self._v * s)
+
+	def homogenise(self):
+		iw = 1.0/self._v[3]
+		return vec4.from_vec3(self._v[0:3] * iw, 1)
+
+	def vec3(self):
+		return self.homogenise().xyz
 
 
 	def __add__(self, r):
@@ -209,10 +216,10 @@ class vec4(object):
 		return self._v[i]
 
 	def __str__(self):
-		return "(%s, %s, %s)" % (_format_number(self._v[0]), _format_number(self._v[1]), _format_number(self._v[2]))
+		return "(%s, %s, %s, %s)" % (_format_number(self._v[0]), _format_number(self._v[1]), _format_number(self._v[2]),  _format_number(self._v[3]))
 
 	def __repr__(self):
-		return "Vec4(%s, %s, %s)" % (self._v[0], self._v[1], self._v[2])
+		return "Vec4(%s, %s, %s, %s)" % (self._v[0], self._v[1], self._v[2], self._v[3])
 
 class mat4(object):
 	"""docstring for mat4"""
