@@ -97,6 +97,9 @@ def run():
 	global asciirenderer
 	asciirenderer = ascii.AsciiRenderer(gl)
 	
+	asciirenderer.fog_min = 100
+	asciirenderer.fog_max = 400
+	
 	old_time = clock.tick()
 
 	# Enter game loop

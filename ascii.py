@@ -98,6 +98,9 @@ uniform sampler2D sampler_depth;
 
 uniform mat4 proj_inv;
 
+uniform float fog_min;
+uniform float fog_max;
+
 #ifdef _FRAGMENT_
 
 // output is RGB-edge
@@ -159,7 +162,9 @@ void main() {
 		for(int dy = -1; dy <= 1; ++dy) {		
 			vec2 offset = vec2(dx, dy);
 			float depth = texture_depth(fullscreen_tex_coord + offset / vec2(textureSize(sampler_color, 0)));
-			img_d[dy + 1][dx + 1] = depth; //log(depth * 0.01 + 1.0) / log(1000 * 0.01 + 1.0);
+			// depth 'fog'
+			depth = mix(depth, fog_min + (fog_max - fog_min) * 0.1, smoothstep(fog_min, fog_max, depth));
+			img_d[dy + 1][dx + 1] = depth;
 		}
 	}
 	
@@ -2207,6 +2212,10 @@ class AsciiRenderer:
 		self.fgcolor = (1, 1, 1)
 		self.bgcolor = (0, 0, 0)
 		
+		# 'depth fog'
+		self.fog_min = 9001
+		self.fog_max = 9002
+		
 		# char size in pixels (w, h)
 		self._char_size = (6, 8)
 		
@@ -2636,6 +2645,8 @@ class AsciiRenderer:
 		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_color'), 0)
 		gl.glUniform1i(gl.glGetUniformLocation(prog_edge, 'sampler_depth'), 1)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog_edge, 'proj_inv'), 1, True, c_array(GLfloat, proj.inverse().flatten()))
+		gl.glUniform1f(gl.glGetUniformLocation(prog_edge, 'fog_min'), self.fog_min)
+		gl.glUniform1f(gl.glGetUniformLocation(prog_edge, 'fog_max'), self.fog_max)
 		
 		self._draw_dummy()
 		
