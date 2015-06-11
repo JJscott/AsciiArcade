@@ -73,6 +73,7 @@ def run():
 	# Load geometry
 	# 
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"bullet",		"Assets/Projectiles/ArrowHead.obj")
+	ArcadeGame.Assets.load_inst_geometry(gl, 	"mine",			"Assets/Mine/Mine.obj")
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid1",	"Assets/Asteroids/Asteroid1.obj", center=True)
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid2",	"Assets/Asteroids/Asteroid2.obj", center=True)
 	ArcadeGame.Assets.load_inst_geometry(gl, 	"asteroid3",	"Assets/Asteroids/Asteroid3.obj", center=True)
@@ -86,10 +87,11 @@ def run():
 
 	# Load shader
 	# 
-	ArcadeGame.Assets.load_shader(gl, "bullet",	open("Assets/Shaders/bullet_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "bullet",		open("Assets/Shaders/bullet_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "mine",		open("Assets/Shaders/mine_shader.glsl").read())
 	ArcadeGame.Assets.load_shader(gl, "asteroid",	open("Assets/Shaders/asteroid_shader.glsl").read())
 	ArcadeGame.Assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
-	ArcadeGame.Assets.load_shader(gl, "sphere",	open("Assets/Shaders/red_sphere_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "sphere",		open("Assets/Shaders/red_sphere_shader.glsl").read())
 
 	global game
 	game = ArcadeMenuState()

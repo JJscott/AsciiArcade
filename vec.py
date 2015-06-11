@@ -478,6 +478,19 @@ class sphere(object):
 		return "sphere(" + str(self.center) + ", r=" + str(self.radius) + ")"
 
 
+
+def ray_plane_intersection((o, v), (n, d)):
+	"""
+	blah blah blah returns t of the parametric form blah blah blah
+
+	Expects the ray and plane direction to be normalized
+	"""
+	tri_height = v.dot(n)
+	if abs(tri_height) > _EPS:
+		return -(o.dot(n) + d) / tri_height
+	return None
+
+
 def _format_number(n, accuracy=6):
     """Formats a number in a friendly manner (removes trailing zeros and unneccesary point."""
     

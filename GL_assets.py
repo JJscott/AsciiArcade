@@ -118,11 +118,6 @@ def _load_geometry(gl, filename, center, inst=False):
 			radius = (p - p0).mag()
 
 	vao, vbo_mv = _createVAO(gl, vertsOut, normsOut, textsOut, inst)
-
-	print "SOPHERE"
-	print p0
-	print radius
-
 	return vao, vbo_mv, len(vertsOut), sphere(p0, radius)
 
 

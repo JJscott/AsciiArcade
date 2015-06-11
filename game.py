@@ -44,6 +44,7 @@ class GameState(object):
 	def reset(self):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
+		self.scene["mine_collection"] = MineCollection()
 		self.scene["ship"] = Ship()
 		self.scene["enemy_ship"] = EnemyShip()
 		self.scene["asteroid_field"] = AsteroidField()
@@ -91,21 +92,14 @@ class GameState(object):
 			obj.draw(gl, proj, view)
 
 		if ascii_r:
-			if self.scene["ship"].dead:
-				art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
+			for (_, obj) in self.scene.items():
+				obj.draw_ascii(ascii_r, proj, view)
 
-				# temp
-				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+				if self.scene["ship"].dead:
+					art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
 
-			else:
-
-				# Retical for enemy ship
-				#
-				ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.scene["enemy_ship"].position, 1)).vec3()
-				ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-				print ship_ascii_pos
-				ascii_r.draw_text("X------X\n|      |\n\n|      |\n\n|      |\n\n|      |\nX------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
-
+					# temp
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 
 
@@ -158,6 +152,19 @@ class GameState(object):
 		return proj
 
 
+class SceneObject(object):
+	"""docstring for BulletCollection"""
+	def update(self, scene, pressed):
+		pass
+
+	def draw(self, gl, proj, view):
+		pass
+
+	def draw_ascii(self, ascii_r, proj, view):
+		pass
+
+	def get_sphere_list(self):
+		return []
 
 
 
@@ -168,9 +175,7 @@ class GameState(object):
 
 
 
-
-
-class BulletCollection(object):
+class BulletCollection(SceneObject):
 	"""docstring for BulletCollection"""
 	def __init__(self):
 		super(BulletCollection, self).__init__()
@@ -258,7 +263,7 @@ class Bullet(object):
 
 
 
-class Ship(object):
+class Ship(SceneObject):
 
 	"""docstring for Ship"""
 	def __init__(self):
@@ -280,6 +285,8 @@ class Ship(object):
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
+		self.enemy_position = vec3([0, 0, 0]) # doesn't matter what value
+		self.mine_positions = []
 
 
 		# Get joystick controls
@@ -369,23 +376,14 @@ class Ship(object):
 			move_accel = self.acceleration * controls
 			self.apply_acceleration(move_accel)
 
-
-			
 			# Update euler_rotation
 			# 
-			# z_rot = 0
-			# y_rot = 0
-			# x_rot = 0
-			# if abs(dx) >= 0.01 : z_rot = -dx * math.pi/8; y_rot = -dx * math.pi/16
-			# if abs(dy) >= 0.01 : x_rot = dy * math.pi/8
-			# self.euler_rotation = vec3([x_rot, y_rot, z_rot])
-
 			self.euler_rotation = vec3([
 				self.velocity.y * math.pi/8,
 				-self.velocity.x * math.pi/16,
 				-self.velocity.x * math.pi/8])
 			
-			# Update foward position
+			# Update position
 			#
 			self.position = self.position + self.velocity
 
@@ -395,7 +393,7 @@ class Ship(object):
 			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
 			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)):
-				# self.dead = True
+				self.dead = True
 				return
 
 
@@ -415,29 +413,186 @@ class Ship(object):
 			self.cooldown -= 1
 
 
+		# Keep track of enemy
+		#
+		self.enemy_position = scene["enemy_ship"].position
+
+		# Keep track of active mines
+		#
+		self.mine_positions = scene["mine_collection"].mine_list
+
 
 	def draw(self, gl, proj, view):
-		# Set up matricies
-		#
-		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
-		rotation = self.get_orientation_matrix()
-		position = mat4.translate(self.position.x, self.position.y, self.position.z)
-		mv = view * position * rotation * model
+		if not self.dead:
+			# Set up matricies
+			#
+			model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
+			rotation = self.get_orientation_matrix()
+			position = mat4.translate(self.position.x, self.position.y, self.position.z)
+			mv = view * position * rotation * model
 
+			# Retreive model and shader
+			#
+			vao, vao_size = Assets.get_geometry(tag="ship")
+			prog = Assets.get_shader(tag="ship")
+
+			# Render
+			# 
+			gl.glUseProgram(prog)
+			gl.glBindVertexArray(vao)
+
+			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+			gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+
+
+	def draw_ascii(self, ascii_r, proj, view):
+		if not self.dead:
+			# Retical for enemy ship HACKY
+			#
+			ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.enemy_position, 1)).vec3()
+			ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+			ascii_r.draw_text("X------X\n|      |\n\n|      |\n\n|      |\n\n|      |\nX------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
+
+			# Retical for mines
+			#
+			for m in self.mine_positions:
+				mine_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(m.position, 1)).vec3()
+				mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+				ascii_r.draw_text("X---X\n|      |\n\n|      |\nX---X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class MineCollection(SceneObject):
+	"""docstring for BulletCollection"""
+	def __init__(self):
+		super(MineCollection, self).__init__()
+		self.mine_list = []
+	
+	def update(self, scene, pressed):
+		ship_z = scene["ship"].get_position().z
+		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5 and not b.exploded ]
+		for b in self.mine_list:
+			b.update(scene, pressed)
+			
+
+	def draw(self, gl, proj, view):
 		# Retreive model and shader
 		#
-		vao, vao_size = Assets.get_geometry(tag="ship")
-		prog = Assets.get_shader(tag="ship")
+		vao, vao_size = Assets.get_geometry(tag="mine")
+		inst_vbo = Assets.get_inst_vbo(tag="mine")
+		prog = Assets.get_shader(tag="mine")
 
-		# Render
-		# 
+		# Load geometry, shader and projection once
+		#
 		gl.glUseProgram(prog)
 		gl.glBindVertexArray(vao)
-
-		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
-		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+		# Create and buffer the instance data
+		# 
+		mv_array = []
+		model = mat4.scale(0.5,0.5,0.5)
+
+		for m in self.mine_list:
+			# Set up matricies
+			#
+			position = mat4.translate(m.position.x, m.position.y, m.position.z)
+			mv = (view * position * model).transpose()
+			mv_array.extend(mv.flatten())
+
+		mv_c_array = pygloo.c_array(GLfloat, mv_array)
+		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
+		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
+
+		# Render
+		# 	
+		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+
+
+	def add_mine(self, position, velocity):
+		print "ADDED MINE!!!"
+		self.mine_list.append(Mine(position, velocity=velocity))
+
+	def get_sphere_list(self):
+		# Need t return a generator for all the asteroids
+		return [a.get_sphere() for a in self.mine_list]
+
+class Mine(object):
+	"""docstring for Mine"""
+
+	_speed = 3
+	max_velocity = vec3([  _speed,  _speed,  _speed ])
+	min_velocity = vec3([ -_speed, -_speed, -_speed ])
+	acceleration = vec3([0.3, 0.3, 0.3])
+	dampening = 0.1
+	radius = 1.0
+
+	def __init__(self, position, lock_on_radius = 5, velocity=vec3([0,0,0])):
+		super(Mine, self).__init__()
+
+		self.position = position
+		self.velocity = velocity
+		self.lock_on_radius = lock_on_radius
+		self.exploded = False
+
+	def get_sphere(self):
+		return sphere(self.position, self.radius)
+
+	def apply_acceleration(self, accel):
+		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
+	
+	def update(self, scene, pressed):
+
+		controls = vec3([0,0,0])
+		ship = scene["ship"]
+
+		# Check if ship is within our lock-on radius
+		# 
+		toShip = ship.position - self.position
+		if toShip.mag() < self.lock_on_radius:
+			controls = toShip.unit()
+
+			# Check if we have collided with the ship
+			# 
+			a = self.get_sphere()
+			if any( ss.sphere_intersection(a) <= 0 for ss in ship.get_sphere_list()):
+				# ship.
+				self.exploded = True
+				print "EXPLOSION, EXPLOSION, EXPLOSION ASJDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!!!!!!"
+
+
+
+		# Apply dampening effect
+		# 
+		self.velocity = self.velocity.scale(1-self.dampening)
+
+		# Change the velocity by applying acceleration
+		#
+		move_accel = self.acceleration * controls
+		self.apply_acceleration(move_accel)
+
+		# Update position
+		#
+		self.position = self.position + self.velocity
 
 
 
@@ -453,7 +608,15 @@ class Ship(object):
 
 
 
-class EnemyShip(object):
+
+
+
+
+
+
+
+
+class EnemyShip(SceneObject):
 
 	"""docstring for EnemyShip"""
 	def __init__(self):
@@ -483,7 +646,7 @@ class EnemyShip(object):
 		return self.position
 	
 	def get_view_matrix(self):
-		cam_pos = vec3([0, 0, 6])
+		cam_pos = vec3([0, 3, 6])
 		cam_Xrot = -math.pi / 9
 		ship_pos = vec3([self.position.x, self.position.y, self.position.z])
 		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
@@ -518,6 +681,9 @@ class EnemyShip(object):
 			# if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
+			if pressed[K_m]:
+				scene["mine_collection"].add_mine(self.position, self.velocity)
+
 
 			controls = vec3([dx, dy, 0])
 
@@ -529,8 +695,6 @@ class EnemyShip(object):
 			# Work out if the current course is not going to be appropriate
 			# 
 			if any( s.ray_intersection((self.position, self.velocity)) >= 0 for s in spheres_ahead ):
-				print "OH NO GONNA CRASH!!!!"
-
 				# Do some random raycasts and record the one that is most appropriate
 				# 
 				min_ray = vec3([0,0,-1])		# basis for most minimal change
@@ -538,6 +702,7 @@ class EnemyShip(object):
 				min_change = 1					# how much this ray is from the original ray
 				best_accel_ray = min_ray		# the current best trajectory
 
+				# 10 seems like a good number
 				for _ in range(10):
 					# Come up with possible trajectory ray in terms of controls
 					#
@@ -566,9 +731,7 @@ class EnemyShip(object):
 						if change < min_change:
 							min_change = change
 							best_accel_ray = accel_ray
-							print "FOUND A PATH!!!!", accel_ray
 
-				print "Going to go with the new path ", best_accel_ray
 				controls = best_accel_ray
 
 				
@@ -577,10 +740,10 @@ class EnemyShip(object):
 			#
 			else :
 				controls = vec3 ([
-				math.sin((2*math.pi) * (self.tick_time / self.x_period) ) * 0.1,
-				math.sin((2*math.pi) * (self.tick_time / self.y_period) ) * 0.1,
-				-1
-				])
+					math.sin((2*math.pi) * (self.tick_time / self.x_period) ) * 0.1,
+					math.sin((2*math.pi) * (self.tick_time / self.y_period) ) * 0.1,
+					-1
+					])
 
 			# Apply dampening effect
 			# 
@@ -594,20 +757,12 @@ class EnemyShip(object):
 
 			# Update euler_rotation
 			# 
-			# z_rot = 0
-			# y_rot = 0
-			# x_rot = 0
-			# if abs(dx) >= 0.01 : z_rot = -dx * math.pi/8; y_rot = -dx * math.pi/16
-			# if abs(dy) >= 0.01 : x_rot = dy * math.pi/8
-			# self.euler_rotation = vec3([x_rot, y_rot, z_rot])
-
 			self.euler_rotation = vec3([
 				self.velocity.y * math.pi/8,
 				-self.velocity.x * math.pi/16,
 				-self.velocity.x * math.pi/8])
 
-
-			# Update foward position
+			# Update position
 			#
 			self.position = self.position + self.velocity
 			self.tick_time += 1
@@ -654,7 +809,7 @@ class EnemyShip(object):
 
 
 
-class AsteroidField(object):
+class AsteroidField(SceneObject):
 
 	"""docstring for AsteroidField"""
 	def __init__(self):
@@ -756,8 +911,10 @@ class AsteroidField(object):
 		min_z = sph.center.z - sph.radius
 		max_z = sph.center.z + sph.radius
 
-		return [s for as_slice in self.asteroid_slice_list for s in as_slice.get_sphere_list()
-			if as_slice.min_b.z < max_z and as_slice.max_b.z > min_z and s.sphere_intersection(sph) <= 0]
+		return [s for a_slice in self.asteroid_slice_list for s in a_slice.get_asteroid_collisions(sph)
+			if a_slice.min_b.z < max_z and a_slice.max_b.z > min_z]
+		# return [s for a_slice in self.asteroid_slice_list for s in a_slice.get_sphere_list()
+		# 	if a_slice.min_b.z < max_z and a_slice.max_b.z > min_z and s]
 
 
 
@@ -767,10 +924,16 @@ class AsteroidSlice(object):
 	"""docstring for AsteroidSlice, the best thing since sliced bread"""
 	def __init__(self, ast_sphere_list, min_b, max_b):
 		super(AsteroidSlice, self).__init__()
+
+		# Set up the size
+		#
 		self.min_b = vec3(min_b)
 		self.max_b = vec3(max_b)
 		self.size = vec3(self.max_b - self.min_b)
 
+
+		# Generate asterois
+		# 
 		self.asteroid_list = []
 		self._generate_asteroids(ast_sphere_list)
 
@@ -783,8 +946,7 @@ class AsteroidSlice(object):
 				r = vec3.random().scale( random() * math.pi * 0.02)
 				s = random() * 4 + 0.1
 				n = randrange(1, 8)
-				a = Asteroid(p, rot=r, size=s, ast_num=n)
-				a.sph = ast_sphere_list[n]
+				a = Asteroid(p, rot=r, size=s, ast_num=n, model_sphere=ast_sphere_list[n] )
 				self.asteroid_list.append(a)
 	
 	def get_asteroids(self):
@@ -794,10 +956,8 @@ class AsteroidSlice(object):
 		return [a.get_sphere() for a in self.asteroid_list]
 
 
-	# def get_asteroid_collisions(self, sph):
-		# Can optmize further
-		# 
-		# return [a for a in self.asteroid_list if a.sphere_intersection(sphere)]
+	def get_asteroid_collisions(self, sph):
+		return [s for s in self.get_sphere_list() if s.sphere_intersection(sph) <= 0]
 
 	def update(self, scene, pressed):
 		map(lambda x : x.update(scene, pressed), self.asteroid_list)
@@ -806,15 +966,14 @@ class AsteroidSlice(object):
 
 class Asteroid(object):
 	"""docstring for Asteroid"""
-	def __init__(self, pos, rot=(0,0,0), size=1, ast_num=1):
+	def __init__(self, pos, rot=(0,0,0), size=1, ast_num=1, model_sphere=sphere([0,0,0],0)):
 		super(Asteroid, self).__init__()
 		self.position = vec3(pos) 
 		self.rotation = vec3(rot)
 		self.orientation = quat.axisangle(vec3.random(), 2 * math.pi * random()).unit()
 		self.size = size
 		self.ast_num = ast_num
-
-		self.sph = sphere([0,0,0],0)
+		self.sph = sphere(self.position, model_sphere.radius * self.size * 1.5) #TODO remove artbitrary scaling
 	
 	def update(self, scene, pressed):
 		if (self.rotation.mag() > 0):
@@ -822,7 +981,7 @@ class Asteroid(object):
 
 
 	def get_sphere(self):
-		return sphere(self.sph.center + self.position, self.sph.radius * self.size * 1.5) #TODO change radius of asteroid
+		return self.sph
 	
 	
 
