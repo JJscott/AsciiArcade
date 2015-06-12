@@ -39,7 +39,7 @@ class ArcadeMenuState(object):
 				return game.GameState()
 
 			if pressed[K_h]:
-				return highscore.HighScoreState()
+				return highscore.HighScoreState(0)
 
 
 	# Render logic

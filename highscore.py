@@ -21,7 +21,7 @@ import re
 
 class HighScoreState(object):
 	"""docstring for HighScoreState"""
-	def __init__(self,):
+	def __init__(self, score):
 		super(HighScoreState, self).__init__()
 		self.pause = 0
 		self.path = 'Highscore.txt'
@@ -32,8 +32,6 @@ class HighScoreState(object):
 			string = re.split('\t', line)
 			self.entries.append(string)
 		f.close
-		self.state = 0
-		self.score = 7846
 		self.selected = 0
 		self.alphabet = map(chr, range(65, 91)) + [' ']
 		self.maxsize = len(self.alphabet)
@@ -42,6 +40,11 @@ class HighScoreState(object):
 		self.name = ["","","",""]
 		self.selectindex = 0
 		self.selectlocation = 0.4
+		self.score = score
+		if self.score == None:
+			self.state = 1
+		else:
+			self.state = 0
 
 
 	# Game logic
@@ -128,7 +131,7 @@ class HighScoreState(object):
 				ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.4+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			
-			scoreArt = ascii.wordart(str(self.score), 'big')
+			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
 			ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.1), textorigin = (0.5, 0.5), align = 'c')
 			
 			

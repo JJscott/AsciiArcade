@@ -70,14 +70,14 @@ class GameState(object):
 		if self.scene["ship"].dead:
 			#HACKY HACKY RESET
 			if pressed[K_SPACE]:
-				return HighScoreState()
+				return HighScoreState(None)
 				# self.reset()
 			
 			
 		if self.scene["enemy_ship"].dead:
 			#HACKY HACKY RESET
 			if pressed[K_SPACE]:
-				return HighScoreState()
+				return HighScoreState(self.scene["ship"].score)
 				# self.reset()
 						
 
@@ -262,7 +262,7 @@ class Bullet(object):
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
 			self.exploded = True
 			#enemyship.take_damage(0.5)
-			print "GOT 'UM CHEIF!!!!"
+			print "GOT 'UM CHIEF!!!!"
 
 
 
@@ -305,6 +305,7 @@ class Ship(SceneObject):
 		self.cooldown = 0
 		self.enemy_position = vec3([0, 0, 0]) # doesn't matter what value
 		self.mine_positions = []
+		self.score = 1000
 
 
 		# Get joystick controls
@@ -313,6 +314,8 @@ class Ship(SceneObject):
 			self.joystick = pygame.joystick.Joystick(i)
 			self.joystick.init()
 		
+	def get_score(self):
+		return self.score
 	
 	def get_position(self):
 		return self.position
@@ -353,6 +356,7 @@ class Ship(SceneObject):
 	
 	def take_damage(self, damage):
 		self.health -= damage
+		self.score -= 100
 		
 	def update(self, scene, pressed):
 
@@ -417,6 +421,7 @@ class Ship(SceneObject):
 				return
 
 			#Heath check
+			
 			if self.health <= 0:
 				self.dead = True
 				return
@@ -431,6 +436,7 @@ class Ship(SceneObject):
 					scene["bullet_collection"].add_bullet(self.position + bullet_offset, bullet_direction, self.velocity )
 					scene["bullet_collection"].add_bullet(self.position - bullet_offset, bullet_direction, self.velocity )
 					self.cooldown = 5
+					self.score -= 1
 				self.fired = True
 			else:
 				self.fired = False
@@ -472,6 +478,8 @@ class Ship(SceneObject):
 
 
 	def draw_ascii(self, ascii_r, proj, view):
+		scoreArt = ascii.wordart(('SCORE: '+str(self.score)), 'big')
+		ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), align = 'l')
 		if not self.dead:
 			# Retical for enemy ship HACKY
 			#
