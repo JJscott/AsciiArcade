@@ -72,6 +72,13 @@ class GameState(object):
 			if pressed[K_SPACE]:
 				return HighScoreState()
 				# self.reset()
+			
+			
+		if self.scene["enemy_ship"].dead:
+			#HACKY HACKY RESET
+			if pressed[K_SPACE]:
+				return HighScoreState()
+				# self.reset()
 						
 
 	# Render logic
@@ -183,7 +190,7 @@ class BulletCollection(SceneObject):
 	
 	def update(self, scene, pressed):
 		ship_z = scene["ship"].get_position().z
-		self.bullet_list = [b for b in self.bullet_list if b.power > 0 ] # TODO cleanup / removes if it gets 100 away from the ship
+		self.bullet_list = [b for b in self.bullet_list if b.power > 0 and not b.exploded] # TODO cleanup / removes if it gets 100 away from the ship
 		for b in self.bullet_list:
 			b.update(scene, pressed)
 			
@@ -236,6 +243,7 @@ class Bullet(object):
 		self.position = position
 		self.velocity = direction.unit().scale(5) + velocity
 		self.power = 60				# Live for 60 "ticks"
+		self.exploded = False
 	
 	def get_position(self):
 		return self.position
@@ -246,6 +254,15 @@ class Bullet(object):
 	def update(self, scene, pressed):
 		self.position = self.position + self.velocity
 		self.power -= 1
+		
+		enemyship = scene["enemy_ship"]
+		
+		a = self.get_sphere()
+			
+		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
+			self.exploded = True
+			#enemyship.take_damage(0.5)
+			print "GOT 'UM CHEIF!!!!"
 
 
 
@@ -278,10 +295,11 @@ class Ship(SceneObject):
 		self.acceleration = vec3([0.1, 0.1, 0.1])
 		self.dampening = 0.03
 
-		# Feilds
+		# Fields
 		self.position = vec3([0, 0, 0])
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
+		self.health = 5
 		self.dead = False
 		self.fired = False
 		self.cooldown = 0
@@ -333,6 +351,8 @@ class Ship(SceneObject):
 	def apply_acceleration(self, accel):
 		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
 	
+	def take_damage(self, damage):
+		self.health -= damage
 		
 	def update(self, scene, pressed):
 
@@ -396,7 +416,11 @@ class Ship(SceneObject):
 				self.dead = True
 				return
 
-
+			#Heath check
+			if self.health <= 0:
+				self.dead = True
+				return
+			
 			# Update Bullets
 			#
 			if firebutton == 1:
@@ -574,10 +598,13 @@ class Mine(object):
 			# Check if we have collided with the ship
 			# 
 			a = self.get_sphere()
+			
 			if any( ss.sphere_intersection(a) <= 0 for ss in ship.get_sphere_list()):
 				# ship.
 				self.exploded = True
+				ship.take_damage(1)
 				print "EXPLOSION, EXPLOSION, EXPLOSION ASJDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!!!!!!"
+			
 
 
 
@@ -633,10 +660,11 @@ class EnemyShip(SceneObject):
 		self.x_period = 132.0
 		self.y_period = 233.0
 
-		# Feilds
+		# Fields
 		self.position = vec3([0, 0, -50])
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
+		self.health = 5
 		self.dead = False
 		self.tick_time = 0
 
@@ -668,8 +696,18 @@ class EnemyShip(SceneObject):
 	def apply_acceleration(self, accel):
 		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
 		
+	def take_damage(self, damage):
+		self.health -= damage
+	
 	def update(self, scene, pressed):
-
+		
+		#Heath check
+		'''
+		if self.health <= 0:
+			self.dead = True
+			return
+		'''
+		
 		if not self.dead:
 
 			controls = vec3([0,0,0])
