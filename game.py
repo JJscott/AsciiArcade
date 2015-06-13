@@ -694,7 +694,7 @@ class EnemyShip(SceneObject):
 	def get_sphere_list(self):
 		#Cheapp TODO 
 		all_spheres = [sphere(self.position + vec3([0, 0, 0]), 2.5)
-			,sphere(self.position + self.velocity.scale(10), self.velocity.mag() * 10 + 1)
+			# ,sphere(self.position + self.velocity.scale(10), self.velocity.mag() * 10 + 1)
 			]
 		return all_spheres
 
