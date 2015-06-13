@@ -40,8 +40,11 @@ class GameState(object):
 		super(GameState, self).__init__()
 		self.substate = ExpositionSubState()
 
+		self.level = 0
+		self.max_level = 10
+
 	def tick(self, pressed):
-		nstate = self.substate.tick(pressed)
+		nstate = self.substate.tick(self, pressed)
 		if nstate:
 			if isinstance(nstate, GameSubState):
 				self.substate = nstate
@@ -53,7 +56,7 @@ class GameState(object):
 
 class GameSubState(object):
 	"""docstring for GameSubState"""
-	def tick(self, pressed):
+	def tick(self, game, pressed):
 		pass
 
 	def render(self, gl, w, h, ascii_r=None):
@@ -72,7 +75,7 @@ class ExpositionSubState(object):
 		super(ExpositionSubState, self).__init__()
 		self.pause = 0
 
-	def tick(self, pressed):
+	def tick(self, game, pressed):
 		# WORK HERE BEN!!!!
 
 		self.pause +=1
@@ -85,9 +88,17 @@ class ExpositionSubState(object):
 		
 
 class LevelInformationSubState(GameSubState):
-	"""docstring for LevelInformationSubState"""
+	"""
+	Displays the current enemy as well as a small exposition before you go into battle
+	"""
 	def __init__(self):
 		super(LevelInformationSubState, self).__init__()
+
+	def tick(self, game, pressed):
+		pass
+
+	def render(self, gl, w, h, ascii_r=None):
+		return mat4.identity()
 		
 
 
@@ -117,7 +128,7 @@ class PlayGameSubState(GameSubState):
 
 	# Game logic
 	#
-	def tick(self, pressed):
+	def tick(self, game, pressed):
 
 		# GameLogic
 		# 
@@ -325,11 +336,6 @@ class Bullet(object):
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
 			self.exploded = True
 			enemyship.take_damage(0.5)
-			print enemyship.health
-			print "GOT 'UM CHIEF!!!!"
-
-
-
 
 
 
@@ -365,7 +371,7 @@ class Ship(SceneObject):
 		self.euler_rotation = vec3([0,0,0])
 		self.health = 5
 		self.dead = False
-		self.fired = False
+		self.fired = True
 		self.cooldown = 0
 		self.enemy_position = vec3([0, 0, 0]) # doesn't matter what value
 		self.mine_positions = []
@@ -496,7 +502,7 @@ class Ship(SceneObject):
 				if not self.fired and self.cooldown <= 0:
 					rotate = self.get_orientation_matrix()
 					bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
-					bullet_offset = rotate.multiply_vec4(vec4([0.5,0,0,0])).xyz
+					bullet_offset = rotate.multiply_vec4(vec4([0.75,0,0,0])).xyz
 					scene["bullet_collection"].add_bullet(self.position + bullet_offset, bullet_direction, self.velocity )
 					scene["bullet_collection"].add_bullet(self.position - bullet_offset, bullet_direction, self.velocity )
 					self.cooldown = 5
@@ -556,7 +562,7 @@ class Ship(SceneObject):
 			for m in self.mine_positions:
 				mine_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(m.position, 1)).vec3()
 				mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-				ascii_r.draw_text("X---X\n|      |\n\n|      |\nX---X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
+				ascii_r.draw_text("X\0X\n\0X\0X\0\n\n\0X\0\n\0X\0X\0\nX\0X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
 
 			# Retical for aiming
 			# 
@@ -568,7 +574,7 @@ class Ship(SceneObject):
 
 				shoot_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(shoot_pos, 1)).vec3()
 				shoot_ascii_pos = (shoot_on_screen + vec3([1,1,1])).scale(0.5)
-				ascii_r.draw_text("\0\0\0|\0\0\0\n\0\0\0|\0\0\0\n---X---\n\0\0\0|\0\0\0\n\0\0\0|\0\0\0", color = (1, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
+				ascii_r.draw_text("\0\0|\0\0|\0\0\n\0\0|\0\0|\0\0\n==#==#==\n\0\0|\0\0|\0\0\n\0\0|\0\0|\0\0", color = (0.333, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
 
 
 
