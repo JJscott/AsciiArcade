@@ -76,9 +76,7 @@ class GameState(object):
 			
 		if self.scene["enemy_ship"].dead:
 			#HACKY HACKY RESET
-			if pressed[K_SPACE]:
-				return HighScoreState(self.scene["ship"].score)
-				# self.reset()
+			return HighScoreState(self.scene["ship"].score)
 						
 
 	# Render logic
@@ -261,7 +259,8 @@ class Bullet(object):
 			
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
 			self.exploded = True
-			#enemyship.take_damage(0.5)
+			enemyship.take_damage(0.5)
+			print enemyship.health
 			print "GOT 'UM CHIEF!!!!"
 
 
@@ -729,11 +728,10 @@ class EnemyShip(SceneObject):
 	def update(self, scene, pressed):
 		
 		#Heath check
-		'''
 		if self.health <= 0:
 			self.dead = True
 			return
-		'''
+
 		
 		if not self.dead:
 
