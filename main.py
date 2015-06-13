@@ -1,4 +1,5 @@
 from math import radians 
+import os
 
 # Pygloo imports
 # 
@@ -117,8 +118,8 @@ def run():
 				return
 			if event.type == VIDEORESIZE:
 				width, height = event.size
-				# this destroys and recreates the GL context; undesirable
-				#screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
+				# this destroys and recreates the GL context on windows; undesirable
+				if os.name != 'nt': screen = pygame.display.set_mode((width, height), HWSURFACE|OPENGL|DOUBLEBUF|RESIZABLE)
 			if event.type == KEYDOWN:
 				if event.key == K_BACKSPACE:
 					global render
