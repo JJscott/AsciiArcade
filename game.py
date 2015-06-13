@@ -542,6 +542,7 @@ class MineCollection(SceneObject):
 		# Create and buffer the instance data
 		# 
 		mv_array = []
+		sphere_mv_array = []
 		model = mat4.scale(0.5,0.5,0.5)
 
 		for m in self.mine_list:
@@ -551,13 +552,37 @@ class MineCollection(SceneObject):
 			mv = (view * position * model).transpose()
 			mv_array.extend(mv.flatten())
 
+			scale = mat4.scale(m.explosion_radius, m.explosion_radius, m.explosion_radius)
+			mv = (view * position * scale).transpose()
+			sphere_mv_array.extend(mv.flatten())
+
 		mv_c_array = pygloo.c_array(GLfloat, mv_array)
 		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
 		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
 
-		# Render
+		# Render Mines
 		# 	
 		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+
+
+		# Retreive model and shader
+		#
+		vao, vao_size = Assets.get_geometry(tag="minesphere")
+		inst_vbo = Assets.get_inst_vbo(tag="minesphere")
+
+		# Load geometry, shader and projection once
+		#
+		gl.glBindVertexArray(vao)
+
+		mv_c_array = pygloo.c_array(GLfloat, sphere_mv_array)
+		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
+		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
+
+		# Render Mine spheres
+		# 	
+		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 
 	def add_mine(self, position, velocity):
@@ -573,7 +598,7 @@ class Mine(object):
 
 	dampening = 0.1
 	radius = 1.0
-	
+
 	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 5, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
@@ -600,9 +625,10 @@ class Mine(object):
 		# Check if ship is within our lock-on radius
 		# 
 		toShip = ship.position - self.position
-		if toShip.mag() < self.explosion_radius:
-			ship.take_damage(1)
-			self.exploded = True
+		if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
+			if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
+				ship.take_damage(1)
+				self.exploded = True
 
 
 		# Apply dampening effect
