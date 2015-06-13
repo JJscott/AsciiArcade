@@ -43,7 +43,7 @@ class GameState(object):
 	def tick(self, pressed):
 		nstate = self.substate.tick(pressed)
 		if nstate:
-			if isinstance(nstate, GameSubstate):
+			if isinstance(nstate, GameSubState):
 				self.substate = nstate
 			else:
 				return nstate
@@ -51,8 +51,8 @@ class GameState(object):
 	def render(self, gl, w, h, ascii_r=None):
 		return self.substate.render(gl, w, h, ascii_r)
 
-class GameSubstate(object):
-	"""docstring for GameSubstate"""
+class GameSubState(object):
+	"""docstring for GameSubState"""
 	def tick(self, pressed):
 		pass
 
@@ -84,21 +84,21 @@ class ExpositionSubState(object):
 		pass
 		
 
-class LevelInformationSubState(GameSubstate):
+class LevelInformationSubState(GameSubState):
 	"""docstring for LevelInformationSubState"""
 	def __init__(self):
 		super(LevelInformationSubState, self).__init__()
 		
 
 
-class LevelSummarySubstate(GameSubstate):
-	"""docstring for LevelSummarySubstate"""
+class LevelSummarySubState(GameSubState):
+	"""docstring for LevelSummarySubState"""
 	def __init__(self):
-		super(LevelSummarySubstate, self).__init__()
+		super(LevelSummarySubState, self).__init__()
 		
 		
 
-class PlayGameSubState(GameSubstate):
+class PlayGameSubState(GameSubState):
 	"""docstring for PlayGameSubState"""
 	def __init__(self):
 		super(PlayGameSubState, self).__init__()
