@@ -571,59 +571,43 @@ class MineCollection(SceneObject):
 class Mine(object):
 	"""docstring for Mine"""
 
-	_speed = 3
-	max_velocity = vec3([  _speed,  _speed,  _speed ])
-	min_velocity = vec3([ -_speed, -_speed, -_speed ])
-	acceleration = vec3([0.3, 0.3, 0.3])
 	dampening = 0.1
 	radius = 1.0
-
-	def __init__(self, position, lock_on_radius = 5, velocity=vec3([0,0,0])):
+	
+	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 5, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
 		self.position = position
 		self.velocity = velocity
-		self.lock_on_radius = lock_on_radius
+		self.explosion_radius_growth = explosion_radius_growth
+		self.max_explosion_radius = max_explosion_radius
+		self.explosion_radius = 0.1
 		self.exploded = False
 
 	def get_sphere(self):
-		return sphere(self.position, self.radius)
+		return sphere(self.position, Mine.radius)
 
-	def apply_acceleration(self, accel):
-		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
 	
 	def update(self, scene, pressed):
 
 		controls = vec3([0,0,0])
 		ship = scene["ship"]
 
+		# Increase explosion radius
+		# 
+		self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
+
 		# Check if ship is within our lock-on radius
 		# 
 		toShip = ship.position - self.position
-		if toShip.mag() < self.lock_on_radius:
-			controls = toShip.unit()
-
-			# Check if we have collided with the ship
-			# 
-			a = self.get_sphere()
-			
-			if any( ss.sphere_intersection(a) <= 0 for ss in ship.get_sphere_list()):
-				# ship.
-				self.exploded = True
-				ship.take_damage(1)
-				print "EXPLOSION, EXPLOSION, EXPLOSION ASJDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!!!!!!"
-			
-
+		if toShip.mag() < self.explosion_radius:
+			ship.take_damage(1)
+			self.exploded = True
 
 
 		# Apply dampening effect
 		# 
-		self.velocity = self.velocity.scale(1-self.dampening)
-
-		# Change the velocity by applying acceleration
-		#
-		move_accel = self.acceleration * controls
-		self.apply_acceleration(move_accel)
+		self.velocity = self.velocity.scale(1-Mine.dampening)
 
 		# Update position
 		#
