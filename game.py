@@ -494,8 +494,17 @@ class Ship(SceneObject):
 				mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
 				ascii_r.draw_text("X---X\n|      |\n\n|      |\nX---X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
 
+			# Retical for aiming
+			# 
+			rotate = self.get_orientation_matrix()
+			bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
+			t = ray_plane_intersection( (self.position, bullet_direction), (vec3([0,0,1]), self.enemy_position.z) )
+			if t:
+				shoot_pos = self.position + bullet_direction.scale(t)
 
-
+				shoot_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(shoot_pos, 1)).vec3()
+				shoot_ascii_pos = vec3.clamp((shoot_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+				ascii_r.draw_text("   |   \n   |   \n---X---\n   |   \n   |   ", color = (1, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
 
 
 
