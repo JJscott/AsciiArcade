@@ -146,13 +146,13 @@ class PlayGameSubState(GameSubState):
 		if self.scene["ship"].dead:
 			#HACKY HACKY RESET
 			if pressed[K_SPACE]:
-				return HighScoreState(None)
+				return HighScoreState(self.scene["ship"].score, 1)
 				# self.reset()
 			
 			
 		if self.scene["enemy_ship"].dead:
 			#HACKY HACKY RESET
-			return HighScoreState(self.scene["ship"].score)
+			return HighScoreState(self.scene["ship"].score, 0)
 						
 
 	# Render logic
