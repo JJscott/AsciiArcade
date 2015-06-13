@@ -33,10 +33,75 @@ import ascii
 Assets = GL_assets()
 
 
+
 class GameState(object):
-	"""GameState"""
+	"""docstring for GameState"""
 	def __init__(self):
 		super(GameState, self).__init__()
+		self.substate = ExpositionSubState()
+
+	def tick(self, pressed):
+		nstate = self.substate.tick(pressed)
+		if nstate:
+			if isinstance(nstate, GameSubstate):
+				self.substate = nstate
+			else:
+				return nstate
+
+	def render(self, gl, w, h, ascii_r=None):
+		return self.substate.render(gl, w, h, ascii_r)
+
+class GameSubstate(object):
+	"""docstring for GameSubstate"""
+	def tick(self, pressed):
+		pass
+
+	def render(self, gl, w, h, ascii_r=None):
+		return mat4.identity()
+	
+
+
+
+
+
+
+
+class ExpositionSubState(object):
+	"""docstring for ExpositionSubState"""
+	def __init__(self):
+		super(ExpositionSubState, self).__init__()
+		self.pause = 0
+
+	def tick(self, pressed):
+		# WORK HERE BEN!!!!
+
+		self.pause +=1
+		if self.pause > 50 and pressed[K_SPACE]:
+			return PlayGameSubState()
+
+	def render(self, gl, w, h, ascii_r=None):
+		# WORK HERE BEN!!!
+		pass
+		
+
+class LevelInformationSubState(GameSubstate):
+	"""docstring for LevelInformationSubState"""
+	def __init__(self):
+		super(LevelInformationSubState, self).__init__()
+		
+
+
+class LevelSummarySubstate(GameSubstate):
+	"""docstring for LevelSummarySubstate"""
+	def __init__(self):
+		super(LevelSummarySubstate, self).__init__()
+		
+		
+
+class PlayGameSubState(GameSubstate):
+	"""docstring for PlayGameSubState"""
+	def __init__(self):
+		super(PlayGameSubState, self).__init__()
 		self.reset()
 		self.show_spheres = False
 			
