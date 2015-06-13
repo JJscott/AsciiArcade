@@ -494,8 +494,17 @@ class Ship(SceneObject):
 				mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
 				ascii_r.draw_text("X---X\n|      |\n\n|      |\nX---X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
 
+			# Retical for aiming
+			# 
+			rotate = self.get_orientation_matrix()
+			bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
+			t = ray_plane_intersection( (self.position, bullet_direction), (vec3([0,0,1]), self.enemy_position.z) )
+			if t:
+				shoot_pos = self.position + bullet_direction.scale(t)
 
-
+				shoot_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(shoot_pos, 1)).vec3()
+				shoot_ascii_pos = vec3.clamp((shoot_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+				ascii_r.draw_text("   |   \n   |   \n---X---\n   |   \n   |   ", color = (1, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
 
 
 
@@ -542,6 +551,7 @@ class MineCollection(SceneObject):
 		# Create and buffer the instance data
 		# 
 		mv_array = []
+		sphere_mv_array = []
 		model = mat4.scale(0.5,0.5,0.5)
 
 		for m in self.mine_list:
@@ -551,13 +561,37 @@ class MineCollection(SceneObject):
 			mv = (view * position * model).transpose()
 			mv_array.extend(mv.flatten())
 
+			scale = mat4.scale(m.explosion_radius, m.explosion_radius, m.explosion_radius)
+			mv = (view * position * scale).transpose()
+			sphere_mv_array.extend(mv.flatten())
+
 		mv_c_array = pygloo.c_array(GLfloat, mv_array)
 		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
 		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
 
-		# Render
+		# Render Mines
 		# 	
 		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+
+
+		# Retreive model and shader
+		#
+		vao, vao_size = Assets.get_geometry(tag="minesphere")
+		inst_vbo = Assets.get_inst_vbo(tag="minesphere")
+
+		# Load geometry, shader and projection once
+		#
+		gl.glBindVertexArray(vao)
+
+		mv_c_array = pygloo.c_array(GLfloat, sphere_mv_array)
+		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
+		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
+
+		# Render Mine spheres
+		# 	
+		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 
 	def add_mine(self, position, velocity):
@@ -571,59 +605,44 @@ class MineCollection(SceneObject):
 class Mine(object):
 	"""docstring for Mine"""
 
-	_speed = 3
-	max_velocity = vec3([  _speed,  _speed,  _speed ])
-	min_velocity = vec3([ -_speed, -_speed, -_speed ])
-	acceleration = vec3([0.3, 0.3, 0.3])
 	dampening = 0.1
 	radius = 1.0
 
-	def __init__(self, position, lock_on_radius = 5, velocity=vec3([0,0,0])):
+	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 5, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
 		self.position = position
 		self.velocity = velocity
-		self.lock_on_radius = lock_on_radius
+		self.explosion_radius_growth = explosion_radius_growth
+		self.max_explosion_radius = max_explosion_radius
+		self.explosion_radius = 0.1
 		self.exploded = False
 
 	def get_sphere(self):
-		return sphere(self.position, self.radius)
+		return sphere(self.position, Mine.radius)
 
-	def apply_acceleration(self, accel):
-		self.velocity = vec3.clamp(self.velocity + accel, self.min_velocity, self.max_velocity)
 	
 	def update(self, scene, pressed):
 
 		controls = vec3([0,0,0])
 		ship = scene["ship"]
 
+		# Increase explosion radius
+		# 
+		self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
+
 		# Check if ship is within our lock-on radius
 		# 
 		toShip = ship.position - self.position
-		if toShip.mag() < self.lock_on_radius:
-			controls = toShip.unit()
-
-			# Check if we have collided with the ship
-			# 
-			a = self.get_sphere()
-			
-			if any( ss.sphere_intersection(a) <= 0 for ss in ship.get_sphere_list()):
-				# ship.
-				self.exploded = True
+		if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
+			if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
 				ship.take_damage(1)
-				print "EXPLOSION, EXPLOSION, EXPLOSION ASJDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!!!!!!"
-			
-
+				self.exploded = True
 
 
 		# Apply dampening effect
 		# 
-		self.velocity = self.velocity.scale(1-self.dampening)
-
-		# Change the velocity by applying acceleration
-		#
-		move_accel = self.acceleration * controls
-		self.apply_acceleration(move_accel)
+		self.velocity = self.velocity.scale(1-Mine.dampening)
 
 		# Update position
 		#
