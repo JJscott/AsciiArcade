@@ -94,6 +94,11 @@ def run():
 	ArcadeGame.Assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
 	ArcadeGame.Assets.load_shader(gl, "sphere",		open("Assets/Shaders/red_sphere_shader.glsl").read())
 
+
+	# Load Sound
+	# 
+	# ArcadeGame.Assets.load_sound("tag", "Assets/Audio/Effects/something.wav")
+
 	global game
 	game = ArcadeMenuState()
 

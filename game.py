@@ -503,8 +503,8 @@ class Ship(SceneObject):
 				shoot_pos = self.position + bullet_direction.scale(t)
 
 				shoot_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(shoot_pos, 1)).vec3()
-				shoot_ascii_pos = vec3.clamp((shoot_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-				ascii_r.draw_text("   |   \n   |   \n---X---\n   |   \n   |   ", color = (1, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
+				shoot_ascii_pos = (shoot_on_screen + vec3([1,1,1])).scale(0.5)
+				ascii_r.draw_text("\0\0\0|\0\0\0\n\0\0\0|\0\0\0\n---X---\n\0\0\0|\0\0\0\n\0\0\0|\0\0\0", color = (1, 1, 1), screenorigin = (shoot_ascii_pos.x,shoot_ascii_pos.y), textorigin = (0.5, 0.5))
 
 
 

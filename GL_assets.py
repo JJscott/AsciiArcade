@@ -6,6 +6,10 @@ from pygloo import *
 from ctypes import *
 from simpleShader import makeProgram
 
+# Pygame lol
+# 
+import pygame.mixer
+
 # Sort of useful mat libs
 # 
 from vec import *
@@ -23,6 +27,9 @@ class GL_assets(object):
 		self.geo_inst_dict = {}
 		self.geo_sphere_dict = {}
 		self.shader_dict = {}
+		self.sound_dict = {}
+
+		pygame.mixer.init()
 
 		# TODO load default geo and stuff
 
@@ -46,6 +53,11 @@ class GL_assets(object):
 		self.shader_dict[tag] = prog
 		print "Added Shader Asset :: tag={t} prog={p}".format(t=tag, p=prog)
 
+	def load_sound(self, tag, filename):
+		sound = pygame.mixer.sound(filename)
+		self.sound_dict[tag] = sound
+		print "Added Sound Asset :: tag={t} filename={f}".format(t=tag, f=filename)
+
 
 	def get_geometry(self, tag=None):
 		if tag: return self.geo_dict[tag]
@@ -63,6 +75,11 @@ class GL_assets(object):
 	def get_shader(self, tag=None):
 		if tag: return self.shader_dict[tag]
 		return None # Change to default
+
+	def get_sound(self, tag=None):
+		if tag: return self.sound_dict[tag]
+		return None
+
 
 
 
