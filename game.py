@@ -419,6 +419,8 @@ class Ship(SceneObject):
 		
 		self.end = 9999 # asteroids end when?
 		
+		self.explode_time = 0.0; # how exploded are we?
+		
 		# Get joystick controls
 		self.joystick_count = pygame.joystick.get_count()
 		for i in range(self.joystick_count):
@@ -472,6 +474,10 @@ class Ship(SceneObject):
 	def update(self, scene, pressed):
 		
 		if self.lose or self.win: self.gameover += 1
+		
+		if self.dead:
+			self.explode_time += 0.5
+		# }
 		
 		if not self.dead:
 
@@ -607,29 +613,33 @@ class Ship(SceneObject):
 
 
 	def draw(self, gl, proj, view):
-		if not self.dead:
-			# Set up matricies
-			#
-			model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
-			rotation = self.get_orientation_matrix()
-			position = mat4.translate(self.position.x, self.position.y, self.position.z)
-			mv = view * position * rotation * model
+		# Set up matricies
+		#
+		model = mat4.rotateY(math.pi) * mat4.scale(0.2,0.2,0.2)
+		rotation = self.get_orientation_matrix()
+		position = mat4.translate(self.position.x, self.position.y, self.position.z)
+		mv = view * position * rotation * model
 
-			# Retreive model and shader
-			#
-			vao, vao_size = Assets.get_geometry(tag="ship")
-			prog = Assets.get_shader(tag="ship")
+		# Retreive model and shader
+		#
+		vao, vao_size = Assets.get_geometry(tag="ship")
+		prog = Assets.get_shader(tag="ship")
 
-			# Render
-			# 
-			gl.glUseProgram(prog)
-			gl.glBindVertexArray(vao)
-			
+		# Render
+		# 
+		gl.glUseProgram(prog)
+		gl.glBindVertexArray(vao)
+		
+		gl.glUniform1f(gl.glGetUniformLocation(prog, "explode_time"), self.explode_time)
+		if self.explode_time > 0.0:
+			gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 1, 0.333, 1)
+		else:
 			gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
-			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
-			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+		# }
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
-			gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
 
 
 	def draw_ascii(self, ascii_r, proj, view):
@@ -853,6 +863,8 @@ class EnemyShip(SceneObject):
 		self.tick_time = 0
 		self.win = False
 		
+		self.explode_time = 0.0 # how exploded are we?
+		
 	
 	def get_position(self):
 		return self.position
@@ -884,6 +896,10 @@ class EnemyShip(SceneObject):
 		self.health -= damage
 	
 	def update(self, scene, pressed):
+		
+		if self.dead:
+			self.explode_time += 0.5
+		# }
 		
 		if not self.dead:
 			#Heath check
@@ -997,10 +1013,12 @@ class EnemyShip(SceneObject):
 				-self.velocity.x * math.pi/16,
 				-self.velocity.x * math.pi/8])
 
-			# Update position
-			#
-			self.position = self.position + self.velocity
 			self.tick_time += 1
+		
+		
+		# Update position, even if dead
+		#
+		self.position = self.position + self.velocity.scale(1 if not self.dead else 0.75)
 
 
 
@@ -1022,7 +1040,12 @@ class EnemyShip(SceneObject):
 		gl.glUseProgram(prog)
 		gl.glBindVertexArray(vao)
 		
-		gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
+		gl.glUniform1f(gl.glGetUniformLocation(prog, "explode_time"), self.explode_time)
+		if self.explode_time > 0.0:
+			gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 1, 0.333, 1)
+		else:
+			gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
+		# }
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 

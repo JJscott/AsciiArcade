@@ -92,7 +92,7 @@ def run():
 	ArcadeGame.Assets.load_shader(gl, "bullet",		open("Assets/Shaders/bullet_shader.glsl").read())
 	ArcadeGame.Assets.load_shader(gl, "mine",		open("Assets/Shaders/mine_shader.glsl").read())
 	ArcadeGame.Assets.load_shader(gl, "asteroid",	open("Assets/Shaders/asteroid_shader.glsl").read())
-	ArcadeGame.Assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read())
+	ArcadeGame.Assets.load_shader(gl, "ship",		open("Assets/Shaders/default_shader.glsl").read(), shader_types=[GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER])
 	ArcadeGame.Assets.load_shader(gl, "sphere",		open("Assets/Shaders/red_sphere_shader.glsl").read())
 
 

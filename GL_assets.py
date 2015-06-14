@@ -49,8 +49,8 @@ class GL_assets(object):
 		print "Added Shader Asset {f} :: tag={t} vao={v} polycount={p} sphere={s}".format(f=filename, t=tag, v=vao, p=size, s=sph)
 
 
-	def load_shader(self, gl, tag, source):
-		prog = makeProgram(gl, "330 core", { GL_VERTEX_SHADER, GL_FRAGMENT_SHADER }, source)
+	def load_shader(self, gl, tag, source, shader_types = [GL_VERTEX_SHADER, GL_FRAGMENT_SHADER]):
+		prog = makeProgram(gl, "330 core", shader_types, source)
 		self.shader_dict[tag] = prog
 		print "Added Shader Asset :: tag={t} prog={p}".format(t=tag, p=prog)
 
