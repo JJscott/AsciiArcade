@@ -27,8 +27,8 @@ from collections import defaultdict
 import pygame
 import ascii
 
-
-# 
+from random import randint
+#
 #
 Assets = GL_assets()
 
@@ -165,6 +165,7 @@ class PlayGameSubState(GameSubState):
 		self.show_score = False
 		self.level = level
 		self.score = score
+		self.soundover = False
 
 		self.reset()
 
@@ -195,15 +196,17 @@ class PlayGameSubState(GameSubState):
 		# Process results of update
 		#
 		ship = self.scene["ship"]
-		if ship.gameover > 60:
+		if ship.gameover > 0 and pygame.mixer.get_busy() == False:
 			if ship.lose:
-				#HACKY HACKY RESET)
-				if pressed[K_SPACE]:
+				if self.soundover == False:
+					Assets.get_sound(tag="gameover").play()
+					self.soundover = True
+				
+				if pressed[K_SPACE] and self.soundover == True:
 					return HighScoreState(self.scene["ship"].score, 0)
 
 			
 			if ship.win:
-				#HACKY HACKY RESET
 				if pressed[K_SPACE]:
 					if not self.show_score:
 						ship.gameover = 0
@@ -598,18 +601,15 @@ class Ship(SceneObject):
 			ship_spheres = self.get_sphere_list()
 			# hacky: we cant die on autopilot
 			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)) and not self.autopilot:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
+				#gameover
 				self.dead = True
 				#return
 
 			#Heath check
 			
 			if self.health <= 0:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
 				self.dead = True
 				#return
 			
@@ -961,9 +961,7 @@ class EnemyShip(SceneObject):
 		if not self.dead:
 			#Heath check
 			if self.health <= 0:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
 				self.dead = True
 				return
 				controls = vec3([0,0,0])
@@ -977,9 +975,7 @@ class EnemyShip(SceneObject):
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
 
 			if pressed[K_m] or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
-				Assets.get_music("minedrop")
-				#pygame.mixer.music.load("Assets/Audio/Effects/MineDrop.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound("minedrop").play()
 				scene["mine_collection"].add_mine(self.position, self.velocity)
 				self.mine_cooldown = self.mine_drop_rate
 

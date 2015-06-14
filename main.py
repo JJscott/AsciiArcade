@@ -108,6 +108,7 @@ def run():
 	ArcadeGame.Assets.load_sound("explosion3", 		"Assets/Audio/Effects/Explosion3.wav")
 	ArcadeGame.Assets.load_sound("explosion4", 		"Assets/Audio/Effects/Explosion4.wav")
 	ArcadeGame.Assets.load_sound("explosion5", 		"Assets/Audio/Effects/Explosion5.wav")
+	ArcadeGame.Assets.load_sound("gameover", 		"Assets/Audio/Effects/GameOver.wav")
 	
 	#Load Music
 	#
