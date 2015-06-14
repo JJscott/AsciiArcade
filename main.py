@@ -98,17 +98,21 @@ def run():
 
 	# Load Sound
 	# 
-	#ArcadeGame.Assets.load_sound("death", 			"Assets/Audio/Effects/Death.wav")
+	
 	ArcadeGame.Assets.load_sound("hitbybullet", 	"Assets/Audio/Effects/HitByBullet.wav")
 	ArcadeGame.Assets.load_sound("hitbymine", 		"Assets/Audio/Effects/HitByMine.wav")
-	#ArcadeGame.Assets.load_sound("minedrop", 		"Assets/Audio/Effects/MineDrop.wav")
+	ArcadeGame.Assets.load_sound("minedrop", 		"Assets/Audio/Effects/MineDrop.wav")
 	ArcadeGame.Assets.load_sound("laser", 			"Assets/Audio/Effects/Laser.wav")
+	ArcadeGame.Assets.load_sound("explosion1", 		"Assets/Audio/Effects/Explosion1.wav")
+	ArcadeGame.Assets.load_sound("explosion2", 		"Assets/Audio/Effects/Explosion2.wav")
+	ArcadeGame.Assets.load_sound("explosion3", 		"Assets/Audio/Effects/Explosion3.wav")
+	ArcadeGame.Assets.load_sound("explosion4", 		"Assets/Audio/Effects/Explosion4.wav")
+	ArcadeGame.Assets.load_sound("explosion5", 		"Assets/Audio/Effects/Explosion5.wav")
 	
 	#Load Music
 	#
 	ArcadeGame.Assets.load_music("music1",			"Assets/Audio/Music/Music1.wav")
-	ArcadeGame.Assets.load_music("death",			"Assets/Audio/Effects/Death.wav")
-	ArcadeGame.Assets.load_music("minedrop",		"Assets/Audio/Effects/MineDrop.wav")
+
 
 	global game
 	game = ArcadeMenuState()
