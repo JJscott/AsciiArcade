@@ -423,7 +423,14 @@ class Bullet(object):
 			Assets.get_sound(tag="hitbybullet").play()
 			enemyship.take_damage(0.5)
 			self.exploded = True
-
+		
+		for m in scene['mine_collection'].mine_list:
+			if m.get_sphere().sphere_intersection(a) <= 0:
+				m.exploded = True
+			# }
+		# }
+	# }
+# }
 
 
 
@@ -839,10 +846,10 @@ class MineCollection(SceneObject):
 class Mine(object):
 	"""docstring for Mine"""
 
-	dampening = 0.1
+	dampening = 0.01
 	radius = 1.0
 
-	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 5, velocity=vec3([0,0,0])):
+	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 2, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
 		self.position = position
@@ -875,7 +882,7 @@ class Mine(object):
 			# 
 			toShip = ship.position - self.position
 			if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
-				if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
+				if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) <= 0 for ss in ship.get_sphere_list()):
 					ship.take_damage(1)
 					Assets.get_sound(tag="hitbymine").play()
 					self.exploded = True
