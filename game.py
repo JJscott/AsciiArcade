@@ -1,4 +1,6 @@
 
+from __future__ import division
+
 # Pygloo imports
 # 
 import pygloo
@@ -519,6 +521,8 @@ class Ship(SceneObject):
 		self.shots_fired = 0
 		self.shots_hit = 0
 		
+		self.ehb = '' # enmey health bar
+		
 		# Get joystick controls
 		self.joystick_count = pygame.joystick.get_count()
 		for i in range(self.joystick_count):
@@ -703,7 +707,9 @@ class Ship(SceneObject):
 
 		# Keep track of enemy
 		#
-		self.enemy_position = scene["enemy_ship"].position
+		enemy = scene["enemy_ship"]
+		self.enemy_position = enemy.position
+		self.ehb = '[' + ('#' * int(enemy.health / enemy.max_health * 20) + '.' * int((1 - enemy.health / enemy.max_health) * 20)) + ']'
 
 		# Keep track of active mines
 		#
@@ -748,7 +754,7 @@ class Ship(SceneObject):
 		if not self.dead:
 			
 			# healthbar
-			ascii_r.draw_text(ascii.box('\n'.join(['|' * (self.health // 1) + ' ' * ((100 - self.health) // 1)] * 3)), color=(1,0.333,1), screenorigin=(0.5,0.0), textorigin=(0.5,0), pos=(0,1))
+			ascii_r.draw_text(ascii.box('\n'.join(['#' * (self.health // 1) + ' ' * ((100 - self.health) // 1)] * 3)), color=(1,0.333,1), screenorigin=(0.5,0.0), textorigin=(0.5,0), pos=(0,1))
 			
 			# Retical for enemy ship HACKY
 			#
@@ -756,6 +762,8 @@ class Ship(SceneObject):
 				ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.enemy_position, 1)).vec3()
 				ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
 				ascii_r.draw_text("X--\0\0\0\0--X\n|\0\0\0\0\0\0\0\0|\n\n\0\0\0\0\0\0\0\0\0\0\n\n\0\0\0\0\0\0\0\0\0\0\n\n|\0\0\0\0\0\0\0\0|\nX--\0\0\0\0--X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
+				ascii_r.draw_text(self.ehb, color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 1), pos=(0,-4))
+				
 
 			# Retical for mines
 			#
@@ -995,6 +1003,7 @@ class EnemyShip(SceneObject):
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
 		self.health = h
+		self.max_health = h
 		self.mine_drop_rate = mdr
 		self.mine_cooldown = mdr
 		self.movement_function = m
