@@ -746,6 +746,10 @@ class Ship(SceneObject):
 		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0), pos=(0,-10))
 		
 		if not self.dead:
+			
+			# healthbar
+			ascii_r.draw_text(ascii.box('\n'.join(['|' * (self.health // 1) + ' ' * ((100 - self.health) // 1)] * 3)), color=(1,0.333,1), screenorigin=(0.5,0.0), textorigin=(0.5,0), pos=(0,1))
+			
 			# Retical for enemy ship HACKY
 			#
 			if self.enemy_position.z < self.position.z:
