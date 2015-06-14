@@ -63,7 +63,7 @@ class Controller(object):
 						C_TRIGGER : s>t or self.down[K_SPACE]}
 		self.c_pressed = {k: (v and not self.c_down[k]) for (k, v) in new_c_down.items()}
 		self.c_released = {k: (not v and self.c_down[k]) for (k, v) in new_c_down.items()}
-		self.down = new_down
+		self.c_down = new_c_down
 
 		self._x_axis = x
 		self._y_axis = y
@@ -71,12 +71,12 @@ class Controller(object):
 
 	def key_pressed(self, key):
 		if key in self.c_values:
-			return c_pressed[key]
+			return self.c_pressed[key]
 		return self.pressed[key]
 
 	def key_released(self, key):
 		if key in self.c_values:
-			return c_released[key]
+			return self.c_released[key]
 		return self.released[key]
 
 	def key_down(self, key):
