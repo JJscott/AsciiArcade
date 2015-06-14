@@ -28,8 +28,8 @@ import pygame
 import ascii
 
 
-##
-##
+# 
+#
 Assets = GL_assets()
 
 
@@ -83,7 +83,7 @@ class ExpositionSubState(object):
 	
 	def tick(self, game, pressed):
 		self.pause +=1
-		if self.pause > 20 and pressed[K_SPACE]: return LevelInformationSubState()
+		if self.pause > 20 and pressed[K_SPACE]: return LevelInformationSubState(1)
 	# }
 	
 	def render(self, gl, w, h, ascii_r=None):
@@ -103,9 +103,11 @@ class LevelInformationSubState(GameSubState):
 	"""
 	Displays the current enemy as well as a small exposition before you go into battle
 	"""
-	def __init__(self):
+	def __init__(self, level = 1, score = 0):
 		super(LevelInformationSubState, self).__init__()
 		self.pause = 0
+		self.level = level
+		self.score = score
 
 	def tick(self, game, pressed):
 		self.pause +=1
@@ -156,21 +158,22 @@ class LevelInformationSubState(GameSubState):
 
 class PlayGameSubState(GameSubState):
 	"""docstring for PlayGameSubState"""
-	def __init__(self):
+	def __init__(self, level = 1, score = 0):
 		super(PlayGameSubState, self).__init__()
-		self.reset()
 		self.show_spheres = False
 		self.show_score = False
-			
+		self.level = level
+		self.score = score
+
+		self.reset()
 
 	def reset(self):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["mine_collection"] = MineCollection()
 		self.scene["ship"] = Ship()
-		self.scene["enemy_ship"] = _generate_enemy(1)
+		self.scene["enemy_ship"] = _generate_enemy(self.level)
 		self.scene["asteroid_field"] = AsteroidField()
-		self.scene["mission_info"] = MissionInfo()
 	
 
 	# Game logic
@@ -195,17 +198,19 @@ class PlayGameSubState(GameSubState):
 			if ship.lose:
 				#HACKY HACKY RESET)
 				if pressed[K_SPACE]:
-					return HighScoreState(self.scene["ship"].score, 1)
+					return HighScoreState(self.scene["ship"].score, 0)
 
 			
 			if ship.win:
 				#HACKY HACKY RESET
-				if pressed[K_SPACE] and not self.show_score:
-					ship.gameover = 0
-					self.show_score = True
-
-				elif pressed[K_SPACE]:
-					return HighScoreState(self.scene["ship"].score, 0)
+				if pressed[K_SPACE]:
+					if not self.show_score:
+						ship.gameover = 0
+						self.show_score = True
+					elif self.level < 10:
+						return LevelInformationSubState(self.level+1)
+					else:
+						return HighScoreState(self.scene["ship"].score, 0)
 		# }
 
 	# Render logic
@@ -323,21 +328,6 @@ class SceneObject(object):
 
 
 
-# Class for passing arbitray information around (really hacky DONT JUDGE ME!!!!)
-# 
-class MissionInfo(SceneObject):
-	def __init__(self):
-		self.bonuses = []
-		self.bullet_count = 0
-		self.bullet_hit_count = 0
-		self.ship_unhurt = True
-
-	def add_bonus(self, name, score):
-		self.score.append((name, score))
-
-	def get_score_as_lists(self):
-		return [a for (a,_) in self.score], [b for (_,b) in self.score]
-
 
 
 
@@ -347,9 +337,13 @@ class BulletCollection(SceneObject):
 	def __init__(self):
 		super(BulletCollection, self).__init__()
 		self.bullet_list = []
+
+		self.bullet_count = 0
+		self.bullet_hit_count = 0
 	
 	def update(self, scene, pressed):
 		ship_z = scene["ship"].get_position().z
+		self.bullet_hit_count += len([b for b in self.bullet_list if b.exploded])
 		self.bullet_list = [b for b in self.bullet_list if b.power > 0 and not b.exploded] # TODO cleanup / removes if it gets 100 away from the ship
 		for b in self.bullet_list:
 			b.update(scene, pressed)
@@ -390,6 +384,7 @@ class BulletCollection(SceneObject):
 
 
 	def add_bullet(self, position, direction, velocity):
+		self.bullet_count += 1
 		self.bullet_list.append(Bullet(position, direction, velocity))
 
 	def get_sphere_list(self):
@@ -420,7 +415,6 @@ class Bullet(object):
 		a = self.get_sphere()
 			
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
-			scene["mission_info"].bullet_hit_count += 1
 			Assets.get_sound(tag="hitbybullet").play()
 			enemyship.take_damage(0.5)
 			self.exploded = True
@@ -635,7 +629,6 @@ class Ship(SceneObject):
 			#
 			if firebutton == 1:
 				if not self.fired and self.cooldown <= 0:
-					scene["mission_info"].bullet_count += 2
 					Assets.get_sound(tag="laser").play()
 					rotate = self.get_orientation_matrix()
 					bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
