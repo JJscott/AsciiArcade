@@ -2,6 +2,7 @@
 # Pygame
 # 
 from pygame.locals import *
+from controller import *
 import pygame
 import ascii
 
@@ -25,7 +26,6 @@ class HighScoreState(object):
 		self.selected = 0
 		self.alphabet = map(chr, range(65, 91)) + [' ']
 		self.maxsize = len(self.alphabet)
-		self.pressed = False
 		self.delay = 0
 		self.name = ["A","A","A","A"]
 		self.selectindex = 0
@@ -36,70 +36,71 @@ class HighScoreState(object):
 
 	# Game logic
 	#
-	def tick(self, pressed):
+	def tick(self, controller):
 		self.pause +=1
-		if self.pause > 50:
-			if pressed[K_SPACE]:
-				return ArcadeMenuState()
+		# if self.pause > 50:
+		# 	if controller.key_pressed(C_TRIGGER):
+		# 		return ArcadeMenuState()
 		if self.state==0:
-			if pressed[K_UP]:
-				if not self.pressed and self.delay <= 0:
+			if self.delay <= 0:
+				if controller.key_pressed(C_POS_Y):
 					self.selected += 1
 					self.selected %= self.maxsize
-				self.pressed = True
-				
-			elif pressed[K_DOWN]:
-				if not self.pressed and self.delay <= 0:
+					self.delay = 10
+					
+				elif controller.key_pressed(C_NEG_Y):
 					self.selected -= 1
 					self.selected %= self.maxsize
-				self.pressed = True
-				
-			elif pressed[K_RETURN]:
-				if not self.pressed and self.delay <= 0:
+					self.delay = 10
+					
+				elif controller.key_pressed(C_POS_X):
 					if self.selectindex < 4:
 						self.name[self.selectindex] = self.alphabet[self.selected]
 						self.selectindex += 1
 						self.selectlocation += 0.05
 						self.selected = 0
-				self.pressed = True
-				
-			elif pressed[K_DELETE]:
-				if not self.pressed and self.delay <= 0:
+						self.delay = 10
+					
+				elif controller.key_pressed(C_NEG_X):
 					if self.selectindex > 0:
 						self.selectindex -= 1
 						self.name[self.selectindex] = "A"
 						self.selectlocation -= 0.05
 						self.selected = 0
-				self.pressed = True
+						self.delay = 10
 				
-			else:
-				self.pressed = False
 			self.delay -= 1
 			
-			if self.selectindex >= 4:
-				#correct formatting
-				self.name = str(''.join(self.name))
-				self.entries.append([self.name,self.score])
-				for entry in self.entries:
-					entry[1] = int(entry[1])
-				
-				#sort entries
-				self.entries.sort(key=lambda tup: tup[1])
-				self.entries.reverse()
-				
-				#write to file
-				f = open(self.path,"w")
-				for entry in self.entries:
-					f.write( str(entry[0]) + str("\t") + str(entry[1]) + str('\n') )
-				
-				#reopen and reread
-				f = open(self.path,'r')
-				self.entries = []
-				for line in f:
-					line = re.sub('\n','',line)
-					string = re.split('\t', line)
-					self.entries.append(string)
-				self.state = 2
+			if controller.key_pressed(C_TRIGGER):
+				if self.selectindex < 4:
+					self.selectindex = 4
+				else:
+					#correct formatting
+					self.name = str(''.join(self.name))
+					self.entries.append([self.name,self.score])
+					for entry in self.entries:
+						entry[1] = int(entry[1])
+					
+					#sort entries
+					self.entries.sort(key=lambda tup: tup[1])
+					self.entries.reverse()
+					
+					#write to file
+					f = open(self.path,"w")
+					for entry in self.entries:
+						f.write( str(entry[0]) + str("\t") + str(entry[1]) + str('\n') )
+					
+					#reopen and reread
+					f = open(self.path,'r')
+					self.entries = []
+					for line in f:
+						line = re.sub('\n','',line)
+						string = re.split('\t', line)
+						self.entries.append(string)
+					self.state = 2
+		else:
+			if controller.key_pressed(C_TRIGGER):
+				return ArcadeMenuState()
 
 
 	# Render logic

@@ -1,6 +1,7 @@
 # Pygame
 # 
 from pygame.locals import *
+from controller import *
 
 
 
@@ -34,19 +35,19 @@ class ArcadeMenuState(object):
 
 	# Game logic
 	#
-	def tick(self, pressed):
+	def tick(self, controller):
 		# Update all objects in the scene
 		#
 		scene_itr = self.scene.copy()
 		for (_, obj) in scene_itr.items():
-			obj.update(self.scene, pressed)
+			obj.update(self.scene, controller)
 
 		self.pause +=1
 		if self.pause > 50:
-			if pressed[K_SPACE]:
+			if controller.key_pressed(C_TRIGGER):
 				return game.GameState()
 
-			if pressed[K_h]:
+			if controller.key_pressed(K_h):
 				return highscore.HighScoreState(0,0)
 
 
@@ -114,7 +115,7 @@ class DummyShip(object):
 		return all_spheres
 	
 		
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 
 		x_period = 1000.0
 		y_period = 1333.0

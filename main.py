@@ -151,10 +151,9 @@ def run():
 		
 		# Get key presses and update
 		# 
-		pressed = pygame.key.get_pressed()
 		cont.tick()
 
-		ngame = game.tick(pressed)
+		ngame = game.tick(cont)
 		if ngame: game = ngame
 		
 		

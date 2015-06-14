@@ -15,6 +15,7 @@ from random import randrange, random
 # Pygame
 # 
 from pygame.locals import *
+from controller import *
 
 # State stuff
 # 
@@ -40,8 +41,8 @@ class GameState(object):
 		super(GameState, self).__init__()
 		self.substate = ExpositionSubState()
 
-	def tick(self, pressed):
-		nstate = self.substate.tick(self, pressed)
+	def tick(self, controller):
+		nstate = self.substate.tick(self, controller)
 		if nstate:
 			if isinstance(nstate, GameSubState):
 				self.substate = nstate
@@ -53,7 +54,7 @@ class GameState(object):
 
 class GameSubState(object):
 	"""docstring for GameSubState"""
-	def tick(self, game, pressed):
+	def tick(self, game, controller):
 		pass
 
 	def render(self, gl, w, h, ascii_r=None):
@@ -70,7 +71,6 @@ class ExpositionSubState(object):
 	"""docstring for ExpositionSubState"""
 	def __init__(self):
 		super(ExpositionSubState, self).__init__()
-		self.pause = 0
 		self.textarea = ascii.TextArea((120,60), 'big')
 		self.textarea.align = 'c'
 		self.textarea.showcursor = True
@@ -81,9 +81,8 @@ class ExpositionSubState(object):
 		# }
 	# }
 	
-	def tick(self, game, pressed):
-		self.pause +=1
-		if self.pause > 20 and pressed[K_SPACE]: return LevelInformationSubState(1)
+	def tick(self, game, controller):
+		if controller.key_pressed(C_TRIGGER): return LevelInformationSubState(1)
 	# }
 	
 	def render(self, gl, w, h, ascii_r=None):
@@ -105,15 +104,16 @@ class LevelInformationSubState(GameSubState):
 	"""
 	def __init__(self, level = 1, score = 0):
 		super(LevelInformationSubState, self).__init__()
-		self.pause = 0
 		self.level = level
 		self.score = score
+		self.alive_for = 0
 
-	def tick(self, game, pressed):
-		self.pause +=1
-		if self.pause > 50 and pressed[K_SPACE]: return PlayGameSubState()
+	def tick(self, game, controller):
+		if controller.key_pressed(C_TRIGGER): return PlayGameSubState()
 
 	def render(self, gl, w, h, ascii_r=None):
+
+		self.alive_for += 1
 
 		zfar = 1000
 		znear = 0.1
@@ -124,7 +124,7 @@ class LevelInformationSubState(GameSubState):
 
 		cam_pos = vec3([0,-3,15])
 		view = mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z).inverse()
-		model = mat4.rotateX(math.pi * 0.3) * mat4.rotateY(math.pi * (self.pause/100.0)) * mat4.scale(0.25, 0.25, 0.25)
+		model = mat4.rotateX(math.pi * 0.3) * mat4.rotateY(math.pi * (self.alive_for/100.0)) * mat4.scale(0.25, 0.25, 0.25)
 		mv = view * model
 
 		# Retreive model and shader
@@ -181,18 +181,18 @@ class PlayGameSubState(GameSubState):
 
 	# Game logic
 	#
-	def tick(self, game, pressed):
+	def tick(self, game, controller):
 
 		# GameLogic
 		# 
-		if pressed[K_s]:
+		if controller.key_pressed(K_s):
 			self.show_spheres = not self.show_spheres
 
 		# Update all objects in the scene
 		#
 		scene_itr = self.scene.copy()
 		for (_, obj) in scene_itr.items():
-			obj.update(self.scene, pressed)
+			obj.update(self.scene, controller)
 
 		# Process results of update
 		#
@@ -203,12 +203,12 @@ class PlayGameSubState(GameSubState):
 					Assets.get_sound(tag="gameover").play()
 					self.soundover = True
 				
-				if pressed[K_SPACE] and self.soundover == True:
+				if controller.key_pressed(C_TRIGGER) and self.soundover == True:
 					return HighScoreState(self.scene["ship"].score, 1)
 
 			
 			if ship.win:
-				if pressed[K_SPACE]:
+				if controller.key_pressed(C_TRIGGER):
 					if not self.show_score:
 						ship.gameover = 0
 						self.show_score = True
@@ -319,7 +319,7 @@ class PlayGameSubState(GameSubState):
 
 class SceneObject(object):
 	"""docstring for BulletCollection"""
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		pass
 
 	def draw(self, gl, proj, view):
@@ -346,12 +346,12 @@ class BulletCollection(SceneObject):
 		self.bullet_count = 0
 		self.bullet_hit_count = 0
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		ship_z = scene["ship"].get_position().z
 		self.bullet_hit_count += len([b for b in self.bullet_list if b.exploded])
 		self.bullet_list = [b for b in self.bullet_list if b.power > 0 and not b.exploded] # TODO cleanup / removes if it gets 100 away from the ship
 		for b in self.bullet_list:
-			b.update(scene, pressed)
+			b.update(scene, controller)
 			
 
 	def draw(self, gl, proj, view):
@@ -411,7 +411,7 @@ class Bullet(object):
 	def get_sphere(self):
 		return sphere(self.position, 0.25)
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		self.position = self.position + self.velocity
 		self.power -= 1
 		
@@ -530,7 +530,7 @@ class Ship(SceneObject):
 		self.health -= damage
 		self.score -= 100
 		
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		
 		if self.lose or self.win: self.gameover += 1
 		
@@ -554,13 +554,16 @@ class Ship(SceneObject):
 
 			# Controls for keyboard
 			# 
-			if pressed[K_LEFT] and not pressed[K_RIGHT] :	dx = -1.0
-			if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
-			if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
-			if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
-			if pressed[K_f] and not pressed[K_b]:			dz = -1.0
-			if pressed[K_b] and not pressed[K_f]:			dz =  1.0
-			firebutton = firebutton or pressed[K_SPACE]
+			dx = controller.x_axis()
+			dy = controller.y_axis()
+			firebutton = controller.key_pressed(C_TRIGGER)
+			# if pressed[K_LEFT] and not pressed[K_RIGHT] :	dx = -1.0
+			# if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
+			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
+			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
+			# if pressed[K_f] and not pressed[K_b]:			dz = -1.0
+			# if pressed[K_b] and not pressed[K_f]:			dz =  1.0
+			# firebutton = firebutton or pressed[K_SPACE]
 			
 			
 			# FUCK SAKE IM SICK OF HOLDING BUTTON DOWN!
@@ -587,7 +590,7 @@ class Ship(SceneObject):
 			if self.autopilot:
 				# this is slightly hairy
 				# but otherwise, you can win and then still crash...
-				self.autopilot.update({'asteroid_field' : scene['asteroid_field']}, defaultdict(lambda: False))
+				self.autopilot.update({'asteroid_field' : scene['asteroid_field']}, controller)
 				self.position = self.autopilot.position
 				self.velocity = self.autopilot.velocity
 			# }
@@ -750,11 +753,11 @@ class MineCollection(SceneObject):
 		super(MineCollection, self).__init__()
 		self.mine_list = []
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		ship_z = scene["ship"].get_position().z
 		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5]
 		for b in self.mine_list:
-			b.update(scene, pressed)
+			b.update(scene, controller)
 			
 
 	def draw(self, gl, proj, view, _cache = {}):
@@ -864,7 +867,7 @@ class Mine(object):
 		return sphere(self.position, Mine.radius)
 
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 
 		controls = vec3([0,0,0])
 		ship = scene["ship"]
@@ -986,7 +989,7 @@ class EnemyShip(SceneObject):
 	def take_damage(self, damage):
 		self.health -= damage
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		
 		if self.dead:
 			self.explode_time += 0.5
@@ -1008,7 +1011,7 @@ class EnemyShip(SceneObject):
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
 
-			if pressed[K_m] or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
+			if controller.key_pressed(K_m) or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
 				Assets.get_sound("minedrop").play()
 				scene["mine_collection"].add_mine(self.position, self.velocity)
 				self.mine_cooldown = self.mine_drop_rate
@@ -1174,7 +1177,7 @@ class AsteroidField(SceneObject):
 		self.last_slice_distance = -100 # The last min of the chunk
 		self.zlimit = -10000
 		
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		
 		# Trim the astroid slices behind the ship
 		# 
@@ -1202,7 +1205,7 @@ class AsteroidField(SceneObject):
 		# Update the astroids slices
 		# 
 		# for a in self.asteroid_slice_list:
-		# 	a.update(scene, pressed)
+		# 	a.update(scene, controller)
 	
 
 	def draw(self, gl, proj, view):
@@ -1312,8 +1315,8 @@ class AsteroidSlice(object):
 	def get_asteroid_collisions(self, sph):
 		return [s for s in self.get_sphere_list() if s.sphere_intersection(sph) <= 0]
 
-	def update(self, scene, pressed):
-		map(lambda x : x.update(scene, pressed), self.asteroid_list)
+	def update(self, scene, controller):
+		map(lambda x : x.update(scene, controller), self.asteroid_list)
 
 
 
@@ -1328,7 +1331,7 @@ class Asteroid(object):
 		self.ast_num = ast_num
 		self.sph = sphere(self.position, model_sphere.radius * self.size * 1.5) #TODO remove artbitrary scaling
 	
-	def update(self, scene, pressed):
+	def update(self, scene, controller):
 		if (self.rotation.mag() > 0):
 			self.orientation = self.orientation.multiply(quat.axisangle(self.rotation, self.rotation.mag()).unit())
 
