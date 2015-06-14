@@ -634,7 +634,7 @@ class Ship(SceneObject):
 			
 			# Update Bullets
 			#
-			if firebutton == 1:
+			if not self.autopilot and firebutton == 1:
 				if not self.fired and self.cooldown <= 0:
 					Assets.get_sound(tag="laser").play()
 					rotate = self.get_orientation_matrix()

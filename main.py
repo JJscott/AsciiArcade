@@ -1,5 +1,6 @@
 from math import radians 
 import os
+from controller import *
 
 # Pygloo imports
 # 
@@ -118,6 +119,11 @@ def run():
 	
 	old_time = clock.tick()
 
+
+	# Create an input object (testing)
+	#
+	cont = Controller()
+
 	# Enter game loop
 	#
 	while True:		
@@ -141,6 +147,8 @@ def run():
 		# Get key presses and update
 		# 
 		pressed = pygame.key.get_pressed()
+		cont.tick()
+
 		ngame = game.tick(pressed)
 		if ngame: game = ngame
 		
