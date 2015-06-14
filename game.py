@@ -137,7 +137,7 @@ class LevelInformationSubState(GameSubState):
 		#
 		proj = mat4.perspectiveProjection(math.pi / 3, float(w)/h, znear, zfar)
 
-		cam_pos = vec3([0,-3,15])
+		cam_pos = vec3([0,-4,15])
 		view = mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z).inverse()
 		model = mat4.rotateX(math.pi * 0.3) * mat4.rotateY(math.pi * (self.alive_for/100.0)) * mat4.scale(0.25, 0.25, 0.25)
 		mv = view * model
@@ -161,8 +161,8 @@ class LevelInformationSubState(GameSubState):
 
 
 		if ascii_r:
-			# art = ascii.wordart(self.level_info, 'big', align='c')
-			# ascii_r.draw_text(art, color = (1, 1, 1), screenorigin = (0.5,0.33), textorigin = (0.5, 0.5), align = 'c')
+			art = ascii.wordart("Level {l}".format(l=self.level), 'big', align='c')
+			ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.5,0.333), textorigin = (0.5, 0.0), align = 'c')
 			ascii_r.draw_text(self.textarea, screenorigin=(0.5,0.333), textorigin=(0.5, 1.0))
 
 
@@ -867,7 +867,7 @@ class Mine(object):
 	dampening = 0.01
 	radius = 1.0
 
-	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 2, velocity=vec3([0,0,0])):
+	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 3, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
 		self.position = position
