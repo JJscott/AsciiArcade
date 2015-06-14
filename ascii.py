@@ -2752,8 +2752,9 @@ class AsciiRenderer:
 		# TODO test / check this properly
 		x = pos[0]
 		y = pos[1]
-		x -= tw * textorigin[0] * chardelta[0] + th * textorigin[1] * linedelta[0]
-		y -= th * textorigin[1] * linedelta[1] + tw * textorigin[0] * chardelta[1]
+		# we need to move to _top_ left
+		x -= tw * textorigin[0] * chardelta[0] + th * (1.0 - textorigin[1]) * linedelta[0]
+		y -= th * (1.0 - textorigin[1]) * linedelta[1] + tw * textorigin[0] * chardelta[1]
 		# process lines...
 		from itertools import chain, izip, imap, repeat
 		for line, psize in izip(lines, padsizes):

@@ -15,7 +15,7 @@ from random import randrange, random
 # Pygame
 # 
 from pygame.locals import *
-from controller import *
+from gameInput import *
 
 # State stuff
 # 
@@ -28,7 +28,7 @@ from collections import defaultdict
 import pygame
 import ascii
 
-from random import randint
+from random import randint, choice
 #
 #
 Assets = GL_assets()
@@ -108,6 +108,21 @@ class LevelInformationSubState(GameSubState):
 		self.score = score
 		self.alive_for = 0
 
+		self.textarea = ascii.TextArea((200,40), 'big')
+		self.textarea.align = 'c'
+		self.textarea.showcursor = True
+		self.textarea.blinkinterval = 20
+		self.textarea.writeinterval = 2
+
+		with open('./bandit_dialog.txt') as dialogs, open('./bandit_names.txt') as names, open('./bandit_quips.txt') as quips:
+			d = choice(dialogs.readlines()).strip('\n')
+			n = choice(names.readlines()).strip('\n')
+			q = choice(quips.readlines()).strip('\n')
+
+			level_info = d.format(name=n, quip=q)
+			self.textarea.write(level_info.replace(r'\0', '\0').replace(r'\\', '\\'))
+
+
 	def tick(self, game, controller):
 		if controller.key_pressed(C_TRIGGER): return PlayGameSubState(level=self.level, score=self.score)
 
@@ -146,9 +161,9 @@ class LevelInformationSubState(GameSubState):
 
 
 		if ascii_r:
-			art = ascii.wordart('Procedural mission exposition here\n', 'big', align='c')
-			ascii_r.draw_text(art, color = (1, 1, 1), screenorigin = (0.5,0.33), textorigin = (0.5, 0.5), align = 'c')
-
+			# art = ascii.wordart(self.level_info, 'big', align='c')
+			# ascii_r.draw_text(art, color = (1, 1, 1), screenorigin = (0.5,0.33), textorigin = (0.5, 0.5), align = 'c')
+			ascii_r.draw_text(self.textarea, screenorigin=(0.5,0.333), textorigin=(0.5, 1.0))
 
 
 
