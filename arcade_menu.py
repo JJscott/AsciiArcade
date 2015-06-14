@@ -70,14 +70,12 @@ class ArcadeMenuState(object):
 
 
 		if ascii_r:
-			art1 = ascii.wordart('ASCII', 'big')
-			art2 = ascii.wordart('ARCADE', 'big')
-
-			# temp
-			ascii_r.draw_text(art1, color = (0.333, 1, 1), screenorigin = (0.2, 0.667), textorigin = (0, 0.5), align = 'l')
-			ascii_r.draw_text(art2, color = (1, 0.333, 1), screenorigin = (0.8, 0.333), textorigin = (1, 0.5), align = 'l')
-
-			ascii_r.draw_text("Pres Start", color = (1, 1, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
+			art = ascii.wordart('Asteroid\nStar\nCaptain\n-  II  -', 'star_wars', align='c', linespace=1)
+			ascii_r.draw_text(art, textorigin=(0.5,0.5), screenorigin=(0.5,0.5), color=(0.333,1,1))
+			
+			art2 = ascii.wordart('Press Start', 'big')
+			if self.pause % 50 > 25: ascii_r.draw_text(art2, textorigin=(0.5,0), screenorigin=(0.5,0.1), color=(1,0.333,1))
+			
 		return proj
 		
 
