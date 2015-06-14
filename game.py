@@ -80,7 +80,7 @@ class ExpositionSubState(object):
 		self.textarea.blinkinterval = 20
 		self.textarea.writeinterval = 2
 		with open('./Backstory.txt') as file:
-			self.textarea.write(file.read())
+			self.textarea.write(file.read().replace(r'\0', '\0').replace(r'\\', '\\'))
 		# }
 	# }
 	
