@@ -53,7 +53,7 @@ def render_ascii(w, h):
 	asciirenderer.render(w, h, game)
 # }
 
-render = render_normal
+render = render_ascii
 
 
 def run():
