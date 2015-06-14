@@ -58,15 +58,15 @@ class Controller(object):
 
 		new_c_down = {	C_POS_X : x>t  or self.down[K_RIGHT],
 						C_NEG_X : x<-t or self.down[K_LEFT],
-						C_POS_Y : y>t  or self.down[K_UP],
-						C_NEG_Y : y<-t or self.down[K_DOWN],
+						C_POS_Y : y>t  or self.down[K_DOWN],
+						C_NEG_Y : y<-t or self.down[K_UP],
 						C_TRIGGER : s>t or self.down[K_SPACE]}
 		self.c_pressed = {k: (v and not self.c_down[k]) for (k, v) in new_c_down.items()}
 		self.c_released = {k: (not v and self.c_down[k]) for (k, v) in new_c_down.items()}
 		self.c_down = new_c_down
 
-		self._x_axis = x
-		self._y_axis = y
+		self._x_axis = x + (1.0 if self.down[K_RIGHT] else 0.0) - (1.0 if self.down[K_LEFT] else 0.0)
+		self._y_axis = y + (1.0 if self.down[K_DOWN] else 0.0) - (1.0 if self.down[K_UP] else 0.0)
 
 
 	def key_pressed(self, key):
