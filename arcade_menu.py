@@ -47,7 +47,8 @@ class ArcadeMenuState(object):
 				return game.GameState()
 
 			if pressed[K_h]:
-				return highscore.HighScoreState(0)
+				pygame.mixer.music.stop()
+				return highscore.HighScoreState(0,0)
 
 
 	# Render logic

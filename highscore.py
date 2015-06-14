@@ -37,7 +37,7 @@ class HighScoreState(object):
 		self.maxsize = len(self.alphabet)
 		self.pressed = False
 		self.delay = 0
-		self.name = ["","","",""]
+		self.name = ["A","A","A","A"]
 		self.selectindex = 0
 		self.selectlocation = 0.4
 		self.score = score
@@ -76,7 +76,7 @@ class HighScoreState(object):
 				if not self.pressed and self.delay <= 0:
 					if self.selectindex > 0:
 						self.selectindex -= 1
-						self.name[self.selectindex] = ""
+						self.name[self.selectindex] = "A"
 						self.selectlocation -= 0.05
 						self.selected = 0
 				self.pressed = True
@@ -118,13 +118,14 @@ class HighScoreState(object):
 			titleArt = ascii.wordart('HIGHSCORE', 'big')
 			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
 			
-			
-			selectedArt = ascii.wordart(self.alphabet[self.selected], 'big')
-			ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (self.selectlocation, 0.5), textorigin = (0.5, 0.5), align = 'c')
+			if self.pause % 50 < 25 or self.pressed==True:
+				selectedArt = ascii.wordart(self.alphabet[self.selected], 'big')
+				ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (self.selectlocation, 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			for i in range(0,len(self.name)):
-				nameArt = ascii.wordart(self.name[i], 'big')
-				ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.4+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
+				if not i == self.selectindex:
+					nameArt = ascii.wordart(self.name[i], 'big')
+					ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.4+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			
 			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
