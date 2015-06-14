@@ -15,7 +15,7 @@ from random import randrange, random
 # Pygame
 # 
 from pygame.locals import *
-from controller import *
+from gameInput import *
 
 # State stuff
 # 

@@ -1,6 +1,6 @@
 from math import radians 
 import os
-from controller import *
+from gameInput import *
 
 # Pygloo imports
 # 

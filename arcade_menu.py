@@ -1,7 +1,7 @@
 # Pygame
 # 
 from pygame.locals import *
-from controller import *
+from gameInput import *
 
 
 
