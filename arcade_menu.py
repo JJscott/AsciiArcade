@@ -50,7 +50,7 @@ class ArcadeMenuState(object):
 			if controller.key_pressed(K_h):
 				return highscore.HighScoreState(0,0)
 			
-			if pressed[K_c]:
+			if controller.key_pressed(K_c):
 				return credits.CreditsState()
 
 	# Render logic
