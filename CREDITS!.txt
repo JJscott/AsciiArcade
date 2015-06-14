@@ -8,7 +8,7 @@ Transporter
 Ideas Guy
 Miner
 Heavy Weapons Guy
-
+Control Freak
 
 -- Ben --
 
@@ -21,6 +21,7 @@ Joystick Owner
 Editor
 Demolitionist
 Typewriter
+They See Him Rolling
 
 
 -- Ryan --

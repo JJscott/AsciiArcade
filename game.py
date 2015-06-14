@@ -124,7 +124,7 @@ class LevelInformationSubState(GameSubState):
 
 
 	def tick(self, game, controller):
-		if controller.key_pressed(C_TRIGGER): return PlayGameSubState()
+		if controller.key_pressed(C_TRIGGER): return PlayGameSubState(level=self.level, score=self.score)
 
 	def render(self, gl, w, h, ascii_r=None):
 
@@ -179,7 +179,10 @@ class PlayGameSubState(GameSubState):
 		self.show_spheres = False
 		self.show_score = False
 		self.level = level
+		self.bounty = self.level * 100000
 		self.score = score
+		self.ammo_bill = 0
+		self.damage_bill = 0
 		self.soundover = False
 		pygame.mixer.music.stop()
 
@@ -189,11 +192,21 @@ class PlayGameSubState(GameSubState):
 		self.scene = {}
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["mine_collection"] = MineCollection()
-		self.scene["ship"] = Ship()
 		self.scene["enemy_ship"] = _generate_enemy(self.level)
 		self.scene["asteroid_field"] = AsteroidField()
+		ship = Ship()
+		self.scene["ship"] = ship
+		# display only
+		ship.score = self.score
+		ship.level = self.level
 	
-
+	
+	def update_score(self, ship):
+		self.damage_bill = (100 - ship.health) * 1000
+		self.ammo_bill = ship.shots_fired * 100
+		self.score += self.bounty - self.damage_bill - self.ammo_bill
+	# }
+	
 	# Game logic
 	#
 	def tick(self, game, controller):
@@ -212,25 +225,28 @@ class PlayGameSubState(GameSubState):
 		# Process results of update
 		#
 		ship = self.scene["ship"]
-		if ship.gameover > 0 and pygame.mixer.get_busy() == False:
+		if ship.gameover > 60 and pygame.mixer.get_busy() == False:
 			if ship.lose:
+				# you lost -> game over
+				# enemy escaped -> you suck so no one will pay you bounties
 				if self.soundover == False:
 					Assets.get_sound(tag="gameover").play()
 					self.soundover = True
-				
 				if controller.key_pressed(C_TRIGGER) and self.soundover == True:
-					return HighScoreState(self.scene["ship"].score, 1)
-
-			
-			if ship.win:
+					# still have you enter a name cause multiple levels
+					# but dont update the score from this level
+					return HighScoreState(self.score, 0 if self.score > 0.0 else 1)
+			elif ship.win:
+				# you won -> can continue
 				if controller.key_pressed(C_TRIGGER):
 					if not self.show_score:
-						ship.gameover = 0
+						ship.gameover = 1
 						self.show_score = True
+						self.update_score(ship)
 					elif self.level < 10:
-						return LevelInformationSubState(self.level+1)
+						return LevelInformationSubState(self.level+1, self.score)
 					else:
-						return HighScoreState(self.scene["ship"].score, 0)
+						return HighScoreState(self.score, 0)
 		# }
 
 	# Render logic
@@ -254,30 +270,32 @@ class PlayGameSubState(GameSubState):
 			for (_, obj) in self.scene.items():
 				obj.draw_ascii(ascii_r, proj, view)
 
-			if self.scene['ship'].win:
+			ship = self.scene['ship']
+			
+			if ship.win:
 				if self.show_score :
 					art = ascii.wordart('Bonuses!\n', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.75), textorigin = (0.5, 0.0), align = 'c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.75), textorigin = (0.5, 0.0))
 
 					# Draw the bonus from mission_info
-					art = ascii.wordart('Yep\nsure\nsomething\ncol\n', 'big', align='r')
-					ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.4,0.75), textorigin = (1.0, 1.0), align = 'c')
+					art = ascii.wordart('Bounty\nDamage Bill\nAmmo Bill\nProfit', 'big', align='r')
+					ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.45,0.75), textorigin = (1.0, 1.0))
 
 					#Scores associated with bonuses
-					art = ascii.wordart('15\n35214\n1502\n1653\n', 'big', align='l')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.6,0.75), textorigin = (0.0, 1.0), align = 'c')
+					art = ascii.wordart('${0}\n$-{1}\n$-{2}\n${3}'.format(self.bounty, self.damage_bill, self.ammo_bill, self.score), 'big', align='r')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.55,0.75), textorigin = (0.0, 1.0))
 
 				else :
 					art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
 				
 			elif self.scene["ship"].dead:
 				art = ascii.wordart('YOU HAVE DIED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
-				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
 			
 			elif self.scene["enemy_ship"].win:
 				art = ascii.wordart('YOUR BOUNTY ESCAPED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
-				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
 		# temp ?
 		
 		
@@ -430,13 +448,15 @@ class Bullet(object):
 		self.position = self.position + self.velocity
 		self.power -= 1
 		
+		ship = scene['ship']
 		enemyship = scene["enemy_ship"]
 		
 		a = self.get_sphere()
 			
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
 			Assets.get_sound(tag="hitbybullet").play()
-			enemyship.take_damage(0.5)
+			enemyship.take_damage(10)
+			ship.shots_hit += 1
 			self.exploded = True
 		
 		for m in scene['mine_collection'].mine_list:
@@ -478,13 +498,14 @@ class Ship(SceneObject):
 		self.position = vec3([0, 0, 0])
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
-		self.health = 5
+		self.health = 100
 		self.dead = False
 		self.fired = True
 		self.cooldown = 0
 		self.enemy_position = vec3([0, 0, 0]) # doesn't matter what value
 		self.mine_positions = []
-		self.score = 1000
+		self.score = 0
+		self.level = 1
 		self.win = False
 		self.lose = False
 		self.autopilot = None # instance of EnemyShip for controlling our ship (after winning)
@@ -494,6 +515,9 @@ class Ship(SceneObject):
 		self.end = 9999 # asteroids end when?
 		
 		self.explode_time = 0.0; # how exploded are we?
+		
+		self.shots_fired = 0
+		self.shots_hit = 0
 		
 		# Get joystick controls
 		self.joystick_count = pygame.joystick.get_count()
@@ -543,7 +567,7 @@ class Ship(SceneObject):
 	
 	def take_damage(self, damage):
 		self.health -= damage
-		self.score -= 100
+		#self.score -= 100
 		
 	def update(self, scene, controller):
 		
@@ -605,7 +629,7 @@ class Ship(SceneObject):
 			if self.autopilot:
 				# this is slightly hairy
 				# but otherwise, you can win and then still crash...
-				self.autopilot.update({'asteroid_field' : scene['asteroid_field']}, controller)
+				self.autopilot.update({'asteroid_field' : scene['asteroid_field']}, None)
 				self.position = self.autopilot.position
 				self.velocity = self.autopilot.velocity
 			# }
@@ -669,7 +693,8 @@ class Ship(SceneObject):
 					scene["bullet_collection"].add_bullet(self.position + bullet_offset, bullet_direction, self.velocity )
 					scene["bullet_collection"].add_bullet(self.position - bullet_offset, bullet_direction, self.velocity )
 					self.cooldown = 5
-					self.score -= 1
+					#self.score -= 1
+					self.shots_fired += 1
 				self.fired = True
 			else:
 				self.fired = False
@@ -716,8 +741,9 @@ class Ship(SceneObject):
 
 
 	def draw_ascii(self, ascii_r, proj, view):
-		ascii_r.draw_text(ascii.wordart(('SCORE: '+str(self.score)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0))
-		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), pos=(0,-5))
+		ascii_r.draw_text(ascii.wordart(('LEVEL: '+str(self.level)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0))
+		ascii_r.draw_text(ascii.wordart(('SCORE: '+str(self.score)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0), pos=(0,-5))
+		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0), pos=(0,-10))
 		
 		if not self.dead:
 			# Retical for enemy ship HACKY
@@ -901,7 +927,7 @@ class Mine(object):
 			toShip = ship.position - self.position
 			if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
 				if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) <= 0 for ss in ship.get_sphere_list()):
-					ship.take_damage(1)
+					ship.take_damage(10)
 					Assets.get_sound(tag="hitbymine").play()
 					self.exploded = True
 					self.velocity = ship.velocity
@@ -934,7 +960,7 @@ def _generate_enemy(level):
 
 	difficulty = (level-1)//3 + 1
 
-	health  = (difficulty + 1) * 3
+	health  = (difficulty + 1) * 40
 
 	mine_drop_rate = 128 / difficulty
 
@@ -1006,8 +1032,14 @@ class EnemyShip(SceneObject):
 	
 	def update(self, scene, controller):
 		
+		# controller can be None !!!
+		
 		if self.dead:
 			self.explode_time += 0.5
+		# }
+		
+		if controller and controller.key_pressed(K_w):
+			self.health = 0
 		# }
 		
 		if not self.dead:
@@ -1026,7 +1058,7 @@ class EnemyShip(SceneObject):
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
 
-			if controller.key_pressed(K_m) or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
+			if (controller and controller.key_pressed(K_m)) or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
 				Assets.get_sound("minedrop").play()
 				scene["mine_collection"].add_mine(self.position, self.velocity)
 				self.mine_cooldown = self.mine_drop_rate

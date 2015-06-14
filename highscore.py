@@ -29,9 +29,11 @@ class HighScoreState(object):
 		self.delay = 0
 		self.name = ["A","A","A","A"]
 		self.selectindex = 0
-		self.selectlocation = 0.425
+		self.startlocation = 0.425
+		self.locationspacing = 0.05
 		self.score = score
 		self.state = state
+		self.keyispressed = False
 		pygame.mixer.music.play(-1)
 
 	# Game logic
@@ -44,37 +46,40 @@ class HighScoreState(object):
 		if self.state==0:
 			if self.delay <= 0:
 				if controller.key_pressed(C_POS_Y):
-					self.selected += 1
-					self.selected %= self.maxsize
-					self.delay = 10
+					if self.selectindex < 4:
+						self.selected += 1
+						self.selected %= self.maxsize
+						self.delay = 10
+						self.keyispressed = True
 					
 				elif controller.key_pressed(C_NEG_Y):
-					self.selected -= 1
-					self.selected %= self.maxsize
-					self.delay = 10
-					
+					if self.selectindex < 4:
+						self.selected -= 1
+						self.selected %= self.maxsize
+						self.delay = 10
+						self.keyispressed = True
+						
 				elif controller.key_pressed(C_POS_X):
 					if self.selectindex < 4:
 						self.name[self.selectindex] = self.alphabet[self.selected]
 						self.selectindex += 1
-						self.selectlocation += 0.05
 						self.selected = 0
 						self.delay = 10
+						self.keyispressed = True
 					
 				elif controller.key_pressed(C_NEG_X):
 					if self.selectindex > 0:
 						self.selectindex -= 1
 						self.name[self.selectindex] = "A"
-						self.selectlocation -= 0.05
 						self.selected = 0
 						self.delay = 10
-				
+						self.keyispressed = True
+				else:
+					self.keyispressed = False
 			self.delay -= 1
 			
 			if controller.key_pressed(C_TRIGGER):
-				if self.selectindex < 4:
-					self.selectindex = 4
-				else:
+				if self.selectindex >= 4:
 					#correct formatting
 					self.name = str(''.join(self.name))
 					self.entries.append([self.name,self.score])
@@ -110,14 +115,24 @@ class HighScoreState(object):
 			titleArt = ascii.wordart('HIGHSCORE', 'big')
 			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
 			
-			if self.pause % 50 < 25 or self.pressed==True:
-				selectedArt = ascii.wordart(self.alphabet[self.selected], 'big')
-				ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (self.selectlocation, 0.5), textorigin = (0.5, 0.5), align = 'c')
+			if self.pause % 50 < 25 and self.selectindex >= 4:
+				selectedArt = ascii.wordart("DONE?", 'big')
+				ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.3), textorigin = (0.5, 0.5), align = 'c')
+				
+			elif (self.pause % 50 < 25 or self.keyispressed) and self.selectindex < 4:
+				character = self.alphabet[self.selected]
+				if character == " ":
+					character = "_"
+				selectedArt = ascii.wordart(character, 'big')
+				ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (self.startlocation+(self.selectindex*0.05), 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			for i in range(0,len(self.name)):
 				if not i == self.selectindex:
-					nameArt = ascii.wordart(self.name[i], 'big')
-					ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.425+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
+					character = self.name[i]
+					if character == " ":
+						character = "_"
+					nameArt = ascii.wordart(character, 'big')
+					ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (self.startlocation+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			
 			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
