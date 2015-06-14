@@ -114,13 +114,7 @@ class LevelInformationSubState(GameSubState):
 
 	def render(self, gl, w, h, ascii_r=None):
 		return mat4.identity()
-		
 
-
-class LevelSummarySubState(GameSubState):
-	"""docstring for LevelSummarySubState"""
-	def __init__(self):
-		super(LevelSummarySubState, self).__init__()
 		
 		
 
@@ -130,6 +124,7 @@ class PlayGameSubState(GameSubState):
 		super(PlayGameSubState, self).__init__()
 		self.reset()
 		self.show_spheres = False
+		self.show_score = False
 			
 
 	def reset(self):
@@ -139,6 +134,7 @@ class PlayGameSubState(GameSubState):
 		self.scene["ship"] = Ship()
 		self.scene["enemy_ship"] = EnemyShip()
 		self.scene["asteroid_field"] = AsteroidField()
+		self.scene["mission_info"] = MissionInfo()
 	
 
 	# Game logic
@@ -164,7 +160,7 @@ class PlayGameSubState(GameSubState):
 				#HACKY HACKY RESET)
 				if pressed[K_SPACE]:
 					return HighScoreState(self.scene["ship"].score, 1)
-					# self.reset()
+
 			
 			if ship.win:
 				#HACKY HACKY RESET
@@ -193,17 +189,17 @@ class PlayGameSubState(GameSubState):
 			for (_, obj) in self.scene.items():
 				obj.draw_ascii(ascii_r, proj, view)
 
-				if self.scene['ship'].win:
-					art = ascii.wordart('YOU WIN!\nPress SPACE for\nHighscores', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
-					
-				elif self.scene["ship"].dead:
-					art = ascii.wordart('YOU DIED!\nPress SPACE for\nHighscores', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+			if self.scene['ship'].win:
+				art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 				
-				elif self.scene["enemy_ship"].win:
-					art = ascii.wordart('YOUR BOUNTY ESCAPED!\nPress SPACE for\nHighscores', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+			elif self.scene["ship"].dead:
+				art = ascii.wordart('YOU HAVE DIED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+			
+			elif self.scene["enemy_ship"].win:
+				art = ascii.wordart('YOUR BOUNTY ESCAPED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
+				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 		# temp ?
 		
 		
@@ -274,8 +270,20 @@ class SceneObject(object):
 
 
 
+# Class for passing arbitray information around (really hacky DONT JUDGE ME!!!!)
+# 
+class MissionInfo(SceneObject):
+	def __init__(self):
+		self.score = []
+		self.bullet_count = 0
+		self.bullet_hit_count = 0
 
 
+	def add_score(self, name, score):
+		self.score.append((name, score))
+
+	def get_score_as_lists(self):
+		return [a for (a,_) in self.score], [b for (_,b) in self.score]
 
 
 
@@ -359,6 +367,7 @@ class Bullet(object):
 		a = self.get_sphere()
 			
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
+			scene["mission_info"].bullet_hit_count += 1
 			Assets.get_sound(tag="hitbybullet").play()
 			enemyship.take_damage(0.5)
 			self.exploded = True
@@ -573,6 +582,7 @@ class Ship(SceneObject):
 			#
 			if firebutton == 1:
 				if not self.fired and self.cooldown <= 0:
+					scene["mission_info"].bullet_count += 2
 					Assets.get_sound(tag="laser").play()
 					rotate = self.get_orientation_matrix()
 					bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
