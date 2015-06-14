@@ -35,9 +35,9 @@ class Controller(object):
 		self.threshold = 0.5
 
 		# Get joystick controls
-		self.joystick_count = pygame.joystick.get_count()
-		for i in range(self.joystick_count):
-			self.joystick = pygame.joystick.Joystick(i)
+		self.joystick = None
+		if pygame.joystick.get_count():
+			self.joystick = pygame.joystick.Joystick(0)
 			self.joystick.init()
 
 	def tick(self):
@@ -49,7 +49,7 @@ class Controller(object):
 		self.down = new_down
 
 		t = self.threshold
-		if self.joystick_count:
+		if self.joystick is not None:
 			x = self.joystick.get_axis( 0 )
 			y = self.joystick.get_axis( 1 )
 			s = self.joystick.get_button( 0 )
