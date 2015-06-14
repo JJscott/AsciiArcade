@@ -138,6 +138,7 @@ class LevelInformationSubState(GameSubState):
 		gl.glBindVertexArray(vao)
 		
 		gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
+		gl.glUniform1f(gl.glGetUniformLocation(prog, "explode_time"), 0.0)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
@@ -481,11 +482,11 @@ class Ship(SceneObject):
 		return self.position
 	
 	def get_view_matrix(self):
-		cam_pos = vec3([0, 0, 6])
-		cam_Xrot = -math.pi / 9
+		cam_pos = vec3([0, 1.5, 6])
+		# cam_Xrot = -math.pi / 15
 		ship_pos = vec3([self.position.x, self.position.y, self.position.z])
 		return (mat4.translate(ship_pos.x, ship_pos.y, ship_pos.z) *
-			mat4.rotateX(cam_Xrot) *
+			# mat4.rotateX(cam_Xrot) *
 			mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z)).inverse()
 
 	# Spheres suited to ship model
@@ -698,7 +699,7 @@ class Ship(SceneObject):
 			if self.enemy_position.z < self.position.z:
 				ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.enemy_position, 1)).vec3()
 				ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-				ascii_r.draw_text("X--------X\n|        |\n\n|        |\n\n|        |\n\n|        |\nX--------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
+				ascii_r.draw_text("X--\0\0\0\0--X\n|\0\0\0\0\0\0\0\0|\n\n\0\0\0\0\0\0\0\0\0\0\n\n\0\0\0\0\0\0\0\0\0\0\n\n|\0\0\0\0\0\0\0\0|\nX--\0\0\0\0--X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
 
 			# Retical for mines
 			#
@@ -808,7 +809,7 @@ class MineCollection(SceneObject):
 
 
 	def add_mine(self, position, velocity):
-		print "ADDED MINE!!!"
+		# print "ADDED MINE!!!"
 		self.mine_list.append(Mine(position, velocity=velocity))
 
 	def get_sphere_list(self):
