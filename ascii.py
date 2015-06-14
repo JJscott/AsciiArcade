@@ -566,6 +566,7 @@ void main() {
 	vec2 uv = clamp(fsuv - vec2(textpos), vec2(0.0), vec2(1.0));
 	// manual grad to avoid discontinuities
 	float f = textureGrad(sampler_font, vec3(uv * char_uvlim, codepoint), dFdx(fsuv * char_uvlim), dFdy(fsuv * char_uvlim)).r;
+	f = min(f * 3.0, 1.0);
 	// use font texture to interpolate between bg and fg
 	frag_color = vec4(mix(bgcolor, textcolor, vec3(f)), 1.0);
 	//frag_color = vec4(vec3(texture(sampler_color, fullscreen_tex_coord).a), 1.0);
