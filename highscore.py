@@ -6,6 +6,7 @@
 # Pygame
 # 
 from pygame.locals import *
+import pygame
 import ascii
 
 
@@ -42,6 +43,7 @@ class HighScoreState(object):
 		self.selectlocation = 0.425
 		self.score = score
 		self.state = state
+		pygame.mixer.music.play(-1)
 
 	# Game logic
 	#
