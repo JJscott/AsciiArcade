@@ -40,9 +40,6 @@ class GameState(object):
 		super(GameState, self).__init__()
 		self.substate = ExpositionSubState()
 
-		self.level = 1
-		self.max_level = 10
-
 	def tick(self, pressed):
 		nstate = self.substate.tick(self, pressed)
 		if nstate:
@@ -86,7 +83,7 @@ class ExpositionSubState(object):
 	
 	def tick(self, game, pressed):
 		self.pause +=1
-		if self.pause > 50 and pressed[K_SPACE]: return PlayGameSubState()
+		if self.pause > 20 and pressed[K_SPACE]: return LevelInformationSubState()
 	# }
 	
 	def render(self, gl, w, h, ascii_r=None):
@@ -108,12 +105,51 @@ class LevelInformationSubState(GameSubState):
 	"""
 	def __init__(self):
 		super(LevelInformationSubState, self).__init__()
+		self.pause = 0
 
 	def tick(self, game, pressed):
-		pass
+		self.pause +=1
+		if self.pause > 50 and pressed[K_SPACE]: return PlayGameSubState()
 
 	def render(self, gl, w, h, ascii_r=None):
-		return mat4.identity()
+
+		zfar = 1000
+		znear = 0.1
+
+		# Create view and projection matrix
+		#
+		proj = mat4.perspectiveProjection(math.pi / 3, float(w)/h, znear, zfar)
+
+		cam_pos = vec3([0,-3,15])
+		view = mat4.translate(cam_pos.x, cam_pos.y, cam_pos.z).inverse()
+		model = mat4.rotateX(math.pi * 0.3) * mat4.rotateY(math.pi * (self.pause/100.0)) * mat4.scale(0.25, 0.25, 0.25)
+		mv = view * model
+
+		# Retreive model and shader
+		#
+		vao, vao_size = Assets.get_geometry(tag="enemyship")
+		prog = Assets.get_shader(tag="ship")
+
+		# Render Ship
+		# 
+		gl.glUseProgram(prog)
+		gl.glBindVertexArray(vao)
+		
+		gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
+		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
+
+		gl.glDrawArrays(GL_TRIANGLES, 0, vao_size)
+
+
+		if ascii_r:
+			art = ascii.wordart('Procedural mission exposition here\n', 'big', align='c')
+			ascii_r.draw_text(art, color = (1, 1, 1), screenorigin = (0.5,0.33), textorigin = (0.5, 0.5), align = 'c')
+
+
+
+
+		return proj
 
 		
 		
@@ -132,7 +168,7 @@ class PlayGameSubState(GameSubState):
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["mine_collection"] = MineCollection()
 		self.scene["ship"] = Ship()
-		self.scene["enemy_ship"] = _generate_enemy(10)
+		self.scene["enemy_ship"] = _generate_enemy(1)
 		self.scene["asteroid_field"] = AsteroidField()
 		self.scene["mission_info"] = MissionInfo()
 	
@@ -196,11 +232,16 @@ class PlayGameSubState(GameSubState):
 			if self.scene['ship'].win:
 				if self.show_score :
 					art = ascii.wordart('Bonuses!\n', 'big', align='c')
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.75), textorigin = (0.5, 0), align = 'c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.75), textorigin = (0.5, 0.0), align = 'c')
 
 					# Draw the bonus from mission_info
+					art = ascii.wordart('Yep\nsure\nsomething\ncol\n', 'big', align='r')
+					ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.4,0.75), textorigin = (1.0, 1.0), align = 'c')
 
-				
+					#Scores associated with bonuses
+					art = ascii.wordart('15\n35214\n1502\n1653\n', 'big', align='l')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.6,0.75), textorigin = (0.0, 1.0), align = 'c')
+
 				else :
 					art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
 					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
