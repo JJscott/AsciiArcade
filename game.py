@@ -744,12 +744,12 @@ class MineCollection(SceneObject):
 	
 	def update(self, scene, pressed):
 		ship_z = scene["ship"].get_position().z
-		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5 and not b.exploded ]
+		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5]
 		for b in self.mine_list:
 			b.update(scene, pressed)
 			
 
-	def draw(self, gl, proj, view):
+	def draw(self, gl, proj, view, _cache = {}):
 		# Retreive model and shader
 		#
 		vao, vao_size = Assets.get_geometry(tag="mine")
@@ -762,9 +762,23 @@ class MineCollection(SceneObject):
 		gl.glBindVertexArray(vao)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
+		# explode time instanced vbo
+		vbo_explode_time = _cache.get('vbo_explode_time', None)
+		if not vbo_explode_time:
+			vbo_explode_time = GLuint(0)
+			gl.glGenBuffers(1, vbo_explode_time)
+			_cache['vbo_explode_time'] = vbo_explode_time
+		# }
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_explode_time)
+		gl.glEnableVertexAttribArray(7)
+		gl.glVertexAttribPointer(7, 1, GL_FLOAT, GL_FALSE, 0, 0)
+		gl.glVertexAttribDivisor(7, 1)
+		
 		# Create and buffer the instance data
 		# 
 		mv_array = []
+		et_array = []
 		sphere_mv_array = []
 		model = mat4.scale(0.5,0.5,0.5)
 
@@ -774,7 +788,9 @@ class MineCollection(SceneObject):
 			position = mat4.translate(m.position.x, m.position.y, m.position.z)
 			mv = (view * position * model).transpose()
 			mv_array.extend(mv.flatten())
-
+			
+			et_array.append(m.explode_time)
+			
 			scale = mat4.scale(m.explosion_radius, m.explosion_radius, m.explosion_radius)
 			mv = (view * position * scale).transpose()
 			sphere_mv_array.extend(mv.flatten())
@@ -782,7 +798,10 @@ class MineCollection(SceneObject):
 		mv_c_array = pygloo.c_array(GLfloat, mv_array)
 		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
 		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
-
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_explode_time)
+		gl.glBufferData(GL_ARRAY_BUFFER, len(et_array) * 4, pygloo.c_array(GLfloat, et_array), GL_STREAM_DRAW)
+		
 		# Render Mines
 		# 	
 		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
@@ -804,7 +823,7 @@ class MineCollection(SceneObject):
 		# Render Mine spheres
 		# 	
 		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+		#gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
 		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 
@@ -831,6 +850,7 @@ class Mine(object):
 		self.max_explosion_radius = max_explosion_radius
 		self.explosion_radius = 0.1
 		self.exploded = False
+		self.explode_time = 0.0
 
 	def get_sphere(self):
 		return sphere(self.position, Mine.radius)
@@ -840,20 +860,26 @@ class Mine(object):
 
 		controls = vec3([0,0,0])
 		ship = scene["ship"]
+		
+		if self.exploded:
+			self.explode_time += 0.5
+		# }
+		
+		if not self.exploded:
+			# Increase explosion radius
+			# 
+			self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
 
-		# Increase explosion radius
-		# 
-		self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
-
-		# Check if ship is within our lock-on radius
-		# 
-		toShip = ship.position - self.position
-		if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
-			if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
-				ship.take_damage(1)
-				Assets.get_sound(tag="hitbymine").play()
-				self.exploded = True
-
+			# Check if ship is within our lock-on radius
+			# 
+			toShip = ship.position - self.position
+			if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
+				if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
+					ship.take_damage(1)
+					Assets.get_sound(tag="hitbymine").play()
+					self.exploded = True
+					self.velocity = ship.velocity
+		# }
 
 		# Apply dampening effect
 		# 
