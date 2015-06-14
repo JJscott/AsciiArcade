@@ -40,7 +40,7 @@ class GameState(object):
 		super(GameState, self).__init__()
 		self.substate = ExpositionSubState()
 
-		self.level = 0
+		self.level = 1
 		self.max_level = 10
 
 	def tick(self, pressed):
@@ -132,7 +132,7 @@ class PlayGameSubState(GameSubState):
 		self.scene["bullet_collection"] = BulletCollection()
 		self.scene["mine_collection"] = MineCollection()
 		self.scene["ship"] = Ship()
-		self.scene["enemy_ship"] = EnemyShip()
+		self.scene["enemy_ship"] = _generate_enemy(10)
 		self.scene["asteroid_field"] = AsteroidField()
 		self.scene["mission_info"] = MissionInfo()
 	
@@ -164,7 +164,11 @@ class PlayGameSubState(GameSubState):
 			
 			if ship.win:
 				#HACKY HACKY RESET
-				if pressed[K_SPACE]:
+				if pressed[K_SPACE] and not self.show_score:
+					ship.gameover = 0
+					self.show_score = True
+
+				elif pressed[K_SPACE]:
 					return HighScoreState(self.scene["ship"].score, 0)
 		# }
 
@@ -190,8 +194,16 @@ class PlayGameSubState(GameSubState):
 				obj.draw_ascii(ascii_r, proj, view)
 
 			if self.scene['ship'].win:
-				art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
-				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+				if self.show_score :
+					art = ascii.wordart('Bonuses!\n', 'big', align='c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.75), textorigin = (0.5, 0), align = 'c')
+
+					# Draw the bonus from mission_info
+
+				
+				else :
+					art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 				
 			elif self.scene["ship"].dead:
 				art = ascii.wordart('YOU HAVE DIED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
@@ -274,12 +286,12 @@ class SceneObject(object):
 # 
 class MissionInfo(SceneObject):
 	def __init__(self):
-		self.score = []
+		self.bonuses = []
 		self.bullet_count = 0
 		self.bullet_hit_count = 0
+		self.ship_unhurt = True
 
-
-	def add_score(self, name, score):
+	def add_bonus(self, name, score):
 		self.score.append((name, score))
 
 	def get_score_as_lists(self):
@@ -638,9 +650,10 @@ class Ship(SceneObject):
 		if not self.dead:
 			# Retical for enemy ship HACKY
 			#
-			ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.enemy_position, 1)).vec3()
-			ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-			ascii_r.draw_text("X------X\n|      |\n\n|      |\n\n|      |\n\n|      |\nX------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
+			if self.enemy_position.z < self.position.z:
+				ship_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(self.enemy_position, 1)).vec3()
+				ship_ascii_pos = vec3.clamp((ship_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+				ascii_r.draw_text("X--------X\n|        |\n\n|        |\n\n|        |\n\n|        |\nX--------X", color = (1, 0.333, 1), screenorigin = (ship_ascii_pos.x,ship_ascii_pos.y), textorigin = (0.5, 0.5))
 
 			# Retical for mines
 			#
@@ -816,12 +829,18 @@ class Mine(object):
 
 
 
+_default_movement = lambda time: vec3 ([	math.sin((2*math.pi) * (time / 132.0) ) * 0.1,
+											math.sin((2*math.pi) * (time / 233.0) ) * 0.1, -1 ])
 
+def _generate_enemy(level):
 
+	difficulty = (level-1)//3 + 1
 
+	health  = (difficulty + 1) * 3
 
+	mine_drop_rate = 128 / difficulty
 
-
+	return EnemyShip(health, mine_drop_rate, _default_movement)
 
 
 
@@ -829,7 +848,7 @@ class Mine(object):
 class EnemyShip(SceneObject):
 
 	"""docstring for EnemyShip"""
-	def __init__(self):
+	def __init__(self,h=1, mdr=-1, m=_default_movement):
 		super(EnemyShip, self).__init__()
 		# Constants
 		x_speed = 2
@@ -847,7 +866,10 @@ class EnemyShip(SceneObject):
 		self.position = vec3([0, 0, -50])
 		self.velocity = vec3([0, 0, -2.0])
 		self.euler_rotation = vec3([0,0,0])
-		self.health = 5
+		self.health = h
+		self.mine_drop_rate = mdr
+		self.mine_cooldown = mdr
+		self.movement_function = m
 		self.dead = False
 		self.tick_time = 0
 		self.win = False
@@ -901,11 +923,15 @@ class EnemyShip(SceneObject):
 			# if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
-			if pressed[K_m]:
+
+			if pressed[K_m] or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
 				Assets.get_music("minedrop")
 				#pygame.mixer.music.load("Assets/Audio/Effects/MineDrop.wav")
 				pygame.mixer.music.play(0,0.0)
 				scene["mine_collection"].add_mine(self.position, self.velocity)
+				self.mine_cooldown = self.mine_drop_rate
+
+			self.mine_cooldown -= 1
 
 
 			controls = vec3([dx, dy, 0])
@@ -962,11 +988,12 @@ class EnemyShip(SceneObject):
 			# Carry on with current course (with slight modifications)
 			#
 			else :
-				controls = vec3 ([
-					math.sin((2*math.pi) * (self.tick_time / self.x_period) ) * 0.1,
-					math.sin((2*math.pi) * (self.tick_time / self.y_period) ) * 0.1,
-					-1
-					])
+				controls = self.movement_function(self.tick_time)
+				# controls = vec3 ([
+				# 	math.sin((2*math.pi) * (self.tick_time / self.x_period) ) * 0.1,
+				# 	math.sin((2*math.pi) * (self.tick_time / self.y_period) ) * 0.1,
+				# 	-1
+				# 	])
 
 			# Apply dampening effect
 			# 
