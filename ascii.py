@@ -455,21 +455,25 @@ int edge2ascii() {
 	return int(best);
 }
 
-vec3 color_avg() {
-	vec3 c;
+vec3 color() {
+	vec3 best_color;
+	float min_depth = 9001.0;
 	for (int i = 0; i < char_size.x; i++) {
 		for (int j = 0; j < char_size.y; j++) {
-			c += texelFetch(sampler_color, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).rgb;
+			vec3 c = texelFetch(sampler_color, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).rgb;
+			float d = texelFetch(sampler_depth, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).r;
+			best_color = mix(best_color, c, d < min_depth);
+			min_depth = min(min_depth, d);
 		}
 	}
-	return c / float(char_size.x * char_size.y);
+	return best_color;
 }
 
 void main() {
 	//float lum = dot(vec3(0.2126, 0.7152, 0.0722), color_avg());
 	//int codepoint = int(floor(texture(sampler_lum2ascii, lum).r * 255.0 + 0.5));
 	int codepoint = edge2ascii();
-	frag_ascii = vec4(fgcolor, (float(codepoint) + 0.5) / 255.0);
+	frag_ascii = vec4(color(), (float(codepoint) + 0.5) / 255.0);
 }
 
 #endif

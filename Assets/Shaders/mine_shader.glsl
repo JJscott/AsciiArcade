@@ -42,11 +42,12 @@ in VertexData
 	vec3 tex;
 } v_in;
 
-out vec3 color;
+out vec3 frag_color;
 
 void main(){
-	vec3 grey = vec3(0.8, 0.8, 0.8);
-	color = grey * abs(normalize(v_in.norm).z);
+	//vec3 grey = vec3(0.8, 0.8, 0.8);
+	//color = grey * abs(normalize(v_in.norm).z);
+	frag_color = vec3(1, 0.333, 1);
 }
 
 #endif

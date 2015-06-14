@@ -636,7 +636,8 @@ class Ship(SceneObject):
 			# 
 			gl.glUseProgram(prog)
 			gl.glBindVertexArray(vao)
-
+			
+			gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
 			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
 			gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
@@ -657,10 +658,10 @@ class Ship(SceneObject):
 
 			# Retical for mines
 			#
-			for m in self.mine_positions:
-				mine_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(m.position, 1)).vec3()
-				mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
-				ascii_r.draw_text("X\0X\n\0X\0X\0\n\n\0X\0\n\0X\0X\0\nX\0X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
+			#for m in self.mine_positions:
+			#	mine_on_screen = (proj * view).multiply_vec4(vec4.from_vec3(m.position, 1)).vec3()
+			#	mine_ascii_pos = vec3.clamp((mine_on_screen + vec3([1,1,1])).scale(0.5), vec3([0,0,0]), vec3([1,1,1]))
+			#	ascii_r.draw_text("X\0X\n\0X\0X\0\n\n\0X\0\n\0X\0X\0\nX\0X", color = (1, 0.333, 1), screenorigin = (mine_ascii_pos.x,mine_ascii_pos.y), textorigin = (0.5, 0.5))
 
 			# Retical for aiming
 			# 
@@ -1047,7 +1048,8 @@ class EnemyShip(SceneObject):
 		# 
 		gl.glUseProgram(prog)
 		gl.glBindVertexArray(vao)
-
+		
+		gl.glUniform3f(gl.glGetUniformLocation(prog, "color"), 0.333, 1, 1)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "modelViewMatrix"), 1, True, pygloo.c_array(GLfloat, mv.flatten()))
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
