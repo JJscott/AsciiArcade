@@ -39,7 +39,7 @@ class HighScoreState(object):
 		self.delay = 0
 		self.name = ["A","A","A","A"]
 		self.selectindex = 0
-		self.selectlocation = 0.4
+		self.selectlocation = 0.425
 		self.score = score
 		self.state = state
 
@@ -125,7 +125,7 @@ class HighScoreState(object):
 			for i in range(0,len(self.name)):
 				if not i == self.selectindex:
 					nameArt = ascii.wordart(self.name[i], 'big')
-					ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.4+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
+					ascii_r.draw_text(nameArt, color = (0.333, 1, 1), screenorigin = (0.425+(0.05*i), 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			
 			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
