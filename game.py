@@ -158,18 +158,19 @@ class PlayGameSubState(GameSubState):
 
 		# Process results of update
 		#
-		if self.scene["ship"].dead:
-			#HACKY HACKY RESET)
-			if pressed[K_RETURN]:
-				return HighScoreState(self.scene["ship"].score, 1)
-				# self.reset()
+		ship = self.scene["ship"]
+		if ship.gameover > 60:
+			if ship.lose:
+				#HACKY HACKY RESET)
+				if pressed[K_SPACE]:
+					return HighScoreState(self.scene["ship"].score, 1)
+					# self.reset()
 			
-			
-		if self.scene["enemy_ship"].dead:
-			#HACKY HACKY RESET
-			if pressed[K_RETURN]:
-				return HighScoreState(self.scene["ship"].score, 0)
-						
+			if ship.win:
+				#HACKY HACKY RESET
+				if pressed[K_SPACE]:
+					return HighScoreState(self.scene["ship"].score, 0)
+		# }
 
 	# Render logic
 	#
@@ -192,17 +193,20 @@ class PlayGameSubState(GameSubState):
 			for (_, obj) in self.scene.items():
 				obj.draw_ascii(ascii_r, proj, view)
 
-				if self.scene["ship"].dead:
-					art = ascii.wordart('YOU DIED!\nPRESS ENTER\nTO GO TO\nHIGHSCORE', 'big')
+				if self.scene['ship'].win:
+					art = ascii.wordart('YOU WIN!\nPress SPACE for\nHighscores', 'big', align='c')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+					
+				elif self.scene["ship"].dead:
+					art = ascii.wordart('YOU DIED!\nPress SPACE for\nHighscores', 'big', align='c')
 					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 				
-				elif self.scene["enemy_ship"].dead:
-					art = ascii.wordart('YOU WIN!\nPRESS ENTER\nTO GO TO\nHIGHSCORE', 'big')
+				elif self.scene["enemy_ship"].win:
+					art = ascii.wordart('YOUR BOUNTY ESCAPED!\nPress SPACE for\nHighscores', 'big', align='c')
 					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
-
-					# temp
-					
-			
+		# temp ?
+		
+		
 
 
 		# Debug colliding spheres
@@ -398,8 +402,14 @@ class Ship(SceneObject):
 		self.enemy_position = vec3([0, 0, 0]) # doesn't matter what value
 		self.mine_positions = []
 		self.score = 1000
-
-
+		self.win = False
+		self.lose = False
+		self.autopilot = None # instance of EnemyShip for controlling our ship (after winning)
+		
+		self.gameover = 0 # counter for 'gameover' subsubnotstate
+		
+		self.end = 9999 # asteroids end when?
+		
 		# Get joystick controls
 		self.joystick_count = pygame.joystick.get_count()
 		for i in range(self.joystick_count):
@@ -451,7 +461,9 @@ class Ship(SceneObject):
 		self.score -= 100
 		
 	def update(self, scene, pressed):
-
+		
+		if self.lose or self.win: self.gameover += 1
+		
 		if not self.dead:
 
 			dx = 0
@@ -475,7 +487,8 @@ class Ship(SceneObject):
 			if pressed[K_f] and not pressed[K_b]:			dz = -1.0
 			if pressed[K_b] and not pressed[K_f]:			dz =  1.0
 			firebutton = firebutton or pressed[K_SPACE]
-
+			
+			
 			# FUCK SAKE IM SICK OF HOLDING BUTTON DOWN!
 			# 
 			dz = -1.0
@@ -492,6 +505,20 @@ class Ship(SceneObject):
 			move_accel = self.acceleration * controls
 			self.apply_acceleration(move_accel)
 
+			# Update position
+			#
+			self.position = self.position + self.velocity
+
+			
+			if self.autopilot:
+				# this is slightly hairy
+				# but otherwise, you can win and then still crash...
+				self.autopilot.update({'asteroid_field' : scene['asteroid_field']}, defaultdict(lambda: False))
+				self.position = self.autopilot.position
+				self.velocity = self.autopilot.velocity
+			# }
+			
+			
 			# Update euler_rotation
 			# 
 			self.euler_rotation = vec3([
@@ -499,21 +526,20 @@ class Ship(SceneObject):
 				-self.velocity.x * math.pi/16,
 				-self.velocity.x * math.pi/8])
 			
-			# Update position
-			#
-			self.position = self.position + self.velocity
 
-
+			self.end = max(self.position.z - scene['asteroid_field'].zlimit, 0)
+			
 			# Colision detection
 			#
 			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
-			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)):
+			# hacky: we cant die on autopilot
+			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)) and not self.autopilot:
 				Assets.get_music("death")
 				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
 				pygame.mixer.music.play(0,0.0)
 				self.dead = True
-				return
+				#return
 
 			#Heath check
 			
@@ -522,7 +548,26 @@ class Ship(SceneObject):
 				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
 				pygame.mixer.music.play(0,0.0)
 				self.dead = True
-				return
+				#return
+			
+			if not self.win and scene['enemy_ship'].dead:
+				self.autopilot = EnemyShip()
+				self.autopilot.position = self.position
+				self.autopilot.velocity = self.velocity
+				self.win = True
+			# }
+			
+			if not self.lose and scene['enemy_ship'].win:
+				self.lose = True
+				# you lose the bounty if enemy escapes
+				self.score -= 1000
+			# }
+			
+			if not self.lose and self.dead:
+				self.lose = True
+				# you lose the bounty if you die
+				self.score -= 1000
+			# }
 			
 			# Update Bullets
 			#
@@ -577,8 +622,9 @@ class Ship(SceneObject):
 
 
 	def draw_ascii(self, ascii_r, proj, view):
-		scoreArt = ascii.wordart(('SCORE: '+str(self.score)), 'big')
-		ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), align = 'l')
+		ascii_r.draw_text(ascii.wordart(('SCORE: '+str(self.score)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0))
+		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), pos=(0,-5))
+		
 		if not self.dead:
 			# Retical for enemy ship HACKY
 			#
@@ -794,7 +840,7 @@ class EnemyShip(SceneObject):
 		self.health = 5
 		self.dead = False
 		self.tick_time = 0
-
+		self.win = False
 		
 	
 	def get_position(self):
@@ -915,12 +961,23 @@ class EnemyShip(SceneObject):
 			# Apply dampening effect
 			# 
 			self.velocity = self.velocity.scale(1-self.dampening)
-
+			
 			# Change the velocity by applying acceleration
 			#
 			move_accel = self.acceleration * controls
 			self.apply_acceleration(move_accel)
 
+			# are we winning? (do we even exist?)
+			if (self.position.z < scene['asteroid_field'].zlimit - 100) and (scene.get('enemy_ship', None) is not None):
+				self.velocity = vec3((0, 0, -5))
+				# have we won?
+				if self.position.z < scene['asteroid_field'].zlimit - 1000:
+					if not self.win:
+						self.win = True
+					# }
+				# }
+			# }
+			
 
 			# Update euler_rotation
 			# 
@@ -988,8 +1045,8 @@ class AsteroidField(SceneObject):
 
 		self.next_slice_distance = 400 # How far away the next chunk should be generated
 		self.last_slice_distance = -100 # The last min of the chunk
-
-			
+		self.zlimit = -10000
+		
 	def update(self, scene, pressed):
 		
 		# Trim the astroid slices behind the ship
@@ -1004,7 +1061,8 @@ class AsteroidField(SceneObject):
 		depth = 20
 
 		# If the last slice is closer than next_slice_distance away from the ship
-		if self.last_slice_distance > sz - self.next_slice_distance:
+		# and we havent got to the end of the asteroids
+		if (self.last_slice_distance > sz - self.next_slice_distance) and (self.last_slice_distance > self.zlimit):
 			min_b = vec3([sx-width, sy-width, self.last_slice_distance-depth ])
 			max_b = vec3([sx+width, sy+width, self.last_slice_distance ])
 
@@ -1012,7 +1070,8 @@ class AsteroidField(SceneObject):
 			self.last_slice_distance = min_b.z
 
 			# print "AST COUNT", len([a for ast_slice in self.asteroid_slice_list for a in ast_slice.get_asteroids()])
-
+		
+		
 		# Update the astroids slices
 		# 
 		# for a in self.asteroid_slice_list:
