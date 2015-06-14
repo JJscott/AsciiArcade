@@ -8,6 +8,6 @@ YOU are a Bounty Hunter.\0\0\0
 
 The scumbags of the stars lay low in asteroid fields and you must chase them down before they can escape. The real challenge: being efficient about it. Ammo, fuel, repairs, these things cost money and the less you use, the more you make.\0\0\0
 
-There are plenty of bounties to go around; hunters like you rarely need to compete against one another. I guess some of us get to live the dream...\0\0\0
+These buggers are crafty though. They weave through the 'roids with great skill, and like to drop deadly mines in your path.\0\0\0
 
 GLHF ^_^
