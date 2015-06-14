@@ -81,7 +81,7 @@ class Controller(object):
 
 	def key_down(self, key):
 		if key in self.c_values:
-			return c_down[key]
+			return self.c_down[key]
 		return self.down[key]
 
 	def x_axis(self):
