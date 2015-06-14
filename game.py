@@ -74,18 +74,33 @@ class ExpositionSubState(object):
 	def __init__(self):
 		super(ExpositionSubState, self).__init__()
 		self.pause = 0
-
+		self.textarea = ascii.TextArea((120,60), 'big')
+		self.textarea.align = 'c'
+		self.textarea.showcursor = True
+		self.textarea.blinkinterval = 20
+		self.textarea.writeinterval = 2
+		with open('./Backstory.txt') as file:
+			self.textarea.write(file.read())
+		# }
+	# }
+	
 	def tick(self, game, pressed):
-		# WORK HERE BEN!!!!
-
 		self.pause +=1
-		if self.pause > 50 and pressed[K_SPACE]:
-			return PlayGameSubState()
-
+		if self.pause > 50 and pressed[K_SPACE]: return PlayGameSubState()
+	# }
+	
 	def render(self, gl, w, h, ascii_r=None):
-		# WORK HERE BEN!!!
-		pass
-		
+		if ascii_r is None: return
+		dw, dh = ascii_r._text_size
+		#new_size = (max(0, dw - 20), max(0, dh - 10))
+		#old_size = self.textarea.size
+		#self.textarea.size = new_size
+		#if old_size != new_size: self.textarea.invalidate()
+		#str(self.textarea)
+		ascii_r.draw_text(self.textarea, textorigin=(0.5, 0.5), screenorigin=(0.5,0.5))
+		#print 'foooooo', self.pause
+	# }
+# }
 
 class LevelInformationSubState(GameSubState):
 	"""
