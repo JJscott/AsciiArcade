@@ -741,9 +741,9 @@ class Ship(SceneObject):
 
 
 	def draw_ascii(self, ascii_r, proj, view):
-		ascii_r.draw_text(ascii.wordart(('LEVEL: '+str(self.level)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0))
-		ascii_r.draw_text(ascii.wordart(('SCORE: '+str(self.score)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), pos=(0,-5))
-		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 0.0), pos=(0,-10))
+		ascii_r.draw_text(ascii.wordart(('LEVEL: '+str(self.level)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0))
+		ascii_r.draw_text(ascii.wordart(('SCORE: '+str(self.score)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0), pos=(0,-5))
+		ascii_r.draw_text(ascii.wordart(('END: '+str(self.end)), 'small'), color = (0.333, 1, 1), screenorigin = (0.0, 0.99), textorigin = (0.0, 1.0), pos=(0,-10))
 		
 		if not self.dead:
 			# Retical for enemy ship HACKY
