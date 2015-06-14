@@ -45,21 +45,21 @@ class HighScoreState(object):
 		# 		return ArcadeMenuState()
 		if self.state==0:
 			if self.delay <= 0:
-				if controller.key_pressed(C_POS_Y):
+				if controller.key_down(C_POS_Y):
 					if self.selectindex < 4:
 						self.selected += 1
 						self.selected %= self.maxsize
 						self.delay = 10
 						self.keyispressed = True
 					
-				elif controller.key_pressed(C_NEG_Y):
+				elif controller.key_down(C_NEG_Y):
 					if self.selectindex < 4:
 						self.selected -= 1
 						self.selected %= self.maxsize
 						self.delay = 10
 						self.keyispressed = True
 						
-				elif controller.key_pressed(C_POS_X):
+				elif controller.key_down(C_POS_X):
 					if self.selectindex < 4:
 						self.name[self.selectindex] = self.alphabet[self.selected]
 						self.selectindex += 1
@@ -67,7 +67,7 @@ class HighScoreState(object):
 						self.delay = 10
 						self.keyispressed = True
 					
-				elif controller.key_pressed(C_NEG_X):
+				elif controller.key_down(C_NEG_X):
 					if self.selectindex > 0:
 						self.selectindex -= 1
 						self.name[self.selectindex] = "A"
