@@ -1,24 +1,13 @@
 
-
-
-
-
 # Pygame
 # 
 from pygame.locals import *
 import pygame
 import ascii
 
-
-
-
-import ascii
 from arcade_menu import ArcadeMenuState
 
 import re
-
-
-
 
 class HighScoreState(object):
 	"""docstring for HighScoreState"""
