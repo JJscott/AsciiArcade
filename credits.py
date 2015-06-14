@@ -31,7 +31,7 @@ class CreditsState(object):
 		
 	def render(self, gl, w, h, ascii_r=None):
 		if ascii_r:
-			titleArt = ascii.wordart('CREDITS', 'big')
+			titleArt = ascii.wordart('CREDITS', 'star_wars')
 			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5))
 			
 			ascii_r.draw_text(self.textarea, textorigin=(0.5,0.5), screenorigin=(0.5,0.5))

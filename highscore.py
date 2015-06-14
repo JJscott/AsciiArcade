@@ -111,12 +111,15 @@ class HighScoreState(object):
 	# Render logic
 	#
 	def render(self, gl, w, h, ascii_r=None):
-		if ascii_r and self.state==0:
-			titleArt = ascii.wordart('HIGHSCORE', 'big')
-			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
+
+		titleArt = ascii.wordart('HIGHSCORE', 'star_wars')
+		ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
 			
+
+		if ascii_r and self.state==0:
+
 			if self.pause % 50 < 25 and self.selectindex >= 4:
-				selectedArt = ascii.wordart("DONE?", 'big')
+				selectedArt = ascii.wordart("[SHOOT] to continue", 'big')
 				ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.3), textorigin = (0.5, 0.5), align = 'c')
 				
 			elif (self.pause % 50 < 25 or self.keyispressed) and self.selectindex < 4:
@@ -139,11 +142,7 @@ class HighScoreState(object):
 			ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.1), textorigin = (0.5, 0.5), align = 'c')
 			
 		if ascii_r and self.state>=1:
-			#ascii_r.draw_text("Highscorse har plz!", color = (1, 1, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
-			
-			titleArt = ascii.wordart('HIGHSCORE', 'big')
-			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
-			
+
 			count = 0
 			for entry in self.entries:
 				nameArt = ascii.wordart(entry[0],'big')

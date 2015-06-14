@@ -76,7 +76,7 @@ class ArcadeMenuState(object):
 			art = ascii.wordart('Asteroid\nStar\nCaptain\n-  II  -', 'star_wars', align='c', linespace=1)
 			ascii_r.draw_text(art, textorigin=(0.5,0.5), screenorigin=(0.5,0.5), color=(0.333,1,1))
 			
-			art2 = ascii.wordart('Press Start', 'big')
+			art2 = ascii.wordart('[SHOOT] to start', 'small')
 			if self.pause % 50 > 25: ascii_r.draw_text(art2, textorigin=(0.5,0), screenorigin=(0.5,0.1), color=(1,0.333,1))
 			
 		return proj

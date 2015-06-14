@@ -288,16 +288,25 @@ class PlayGameSubState(GameSubState):
 					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.55,0.75), textorigin = (0.0, 1.0))
 
 				else :
-					art = ascii.wordart('NICE BRO!\n[Press SPACE to continue]', 'big', align='c')
+					art = ascii.wordart('SHOT BRO!', 'big', align='c')
 					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
+
+					art = ascii.wordart('[SHOOT] to continue', 'small', align='c')
+					ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.5,0.3), textorigin = (0.5, 0.5))
 				
 			elif self.scene["ship"].dead:
-				art = ascii.wordart('YOU HAVE DIED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
+				art = ascii.wordart('YOU HAVE DIED !\nYOU LOSE !', 'big', align='c')
 				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
+
+				art = ascii.wordart('[SHOOT] to continue', 'small', align='c')
+				ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.5,0.3), textorigin = (0.5, 0.5))
 			
 			elif self.scene["enemy_ship"].win:
-				art = ascii.wordart('YOUR BOUNTY ESCAPED!\nYOU LOSE!\n[Press SPACE]', 'big', align='c')
+				art = ascii.wordart('YOUR BOUNTY ESCAPED !\nNo one will hire you anymore.\nYOU LOSE !', 'big', align='c')
 				ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5))
+
+				art = ascii.wordart('[SHOOT] to continue', 'small', align='c')
+				ascii_r.draw_text(art, color = (1, 0.333, 1), screenorigin = (0.5,0.3), textorigin = (0.5, 0.5))
 		# temp ?
 		
 		
