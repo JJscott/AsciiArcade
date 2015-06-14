@@ -1,0 +1,12 @@
+You've got another bandit on our hands. This one  calls himself {name} after one of the deadlist bandits in all of comsic history. {quip}
+{name} has escaped from prison, and it's your job to hunt him down. {quip}
+His name is {name} and he's been on our radar for quite a while. {quip}
+{name} has been taking to many liberties lately and we need them taken out. {quip}
+We've been crossed. One of our informants, {name}, has stolen valuable information. The information shouldn't leaves the asteroid belt. {quip}
+What goes around comes around. {name} has killed a few of our fellow bounty hunters and is on the run. {quip}
+The one of the solar system's most natorious bandits, {name}, is on the run. {quip}
+Takes one to know one. {name} is an ex-bounty hunter.
+This one's deadly. {name} has killed more men then I have friends. {quip}
+{name} can be a bit of a handful and will make a mockery of you if you're not careful. {quip}
+{quip}. This one, {name}, must go down as soon as possible.
+Take a leaf out of the bandits book and hunt {name} down ruthlessly. {quip}
