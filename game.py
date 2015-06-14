@@ -144,15 +144,16 @@ class PlayGameSubState(GameSubState):
 		# Process results of update
 		#
 		if self.scene["ship"].dead:
-			#HACKY HACKY RESET
-			if pressed[K_SPACE]:
+			#HACKY HACKY RESET)
+			if pressed[K_RETURN]:
 				return HighScoreState(self.scene["ship"].score, 1)
 				# self.reset()
 			
 			
 		if self.scene["enemy_ship"].dead:
 			#HACKY HACKY RESET
-			return HighScoreState(self.scene["ship"].score, 0)
+			if pressed[K_RETURN]:
+				return HighScoreState(self.scene["ship"].score, 0)
 						
 
 	# Render logic
@@ -177,10 +178,15 @@ class PlayGameSubState(GameSubState):
 				obj.draw_ascii(ascii_r, proj, view)
 
 				if self.scene["ship"].dead:
-					art = ascii.wordart('PRESS SPACE\nTO GO TO\nHIGHSCORE', 'big')
+					art = ascii.wordart('YOU DIED!\nPRESS ENTER\nTO GO TO\nHIGHSCORE', 'big')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+				
+				elif self.scene["enemy_ship"].dead:
+					art = ascii.wordart('YOU WIN!\nPRESS ENTER\nTO GO TO\nHIGHSCORE', 'big')
+					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
 
 					# temp
-					ascii_r.draw_text(art, color = (0.333, 1, 1), screenorigin = (0.5,0.5), textorigin = (0.5, 0.5), align = 'c')
+					
 			
 
 
@@ -334,8 +340,9 @@ class Bullet(object):
 		a = self.get_sphere()
 			
 		if any( ss.sphere_intersection(a) <= 0 for ss in enemyship.get_sphere_list()):
-			self.exploded = True
+			Assets.get_sound(tag="hitbybullet").play()
 			enemyship.take_damage(0.5)
+			self.exploded = True
 
 
 
@@ -487,12 +494,18 @@ class Ship(SceneObject):
 			ship_broad_sphere = sphere(self.position, 4)
 			ship_spheres = self.get_sphere_list()
 			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)):
+				Assets.get_music("death")
+				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
+				pygame.mixer.music.play(0,0.0)
 				self.dead = True
 				return
 
 			#Heath check
 			
 			if self.health <= 0:
+				Assets.get_music("death")
+				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
+				pygame.mixer.music.play(0,0.0)
 				self.dead = True
 				return
 			
@@ -500,6 +513,7 @@ class Ship(SceneObject):
 			#
 			if firebutton == 1:
 				if not self.fired and self.cooldown <= 0:
+					Assets.get_sound(tag="laser").play()
 					rotate = self.get_orientation_matrix()
 					bullet_direction = (rotate.multiply_vec4(vec4([0,0,-1,0])).xyz).unit()
 					bullet_offset = rotate.multiply_vec4(vec4([0.75,0,0,0])).xyz
@@ -707,6 +721,7 @@ class Mine(object):
 		if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
 			if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
 				ship.take_damage(1)
+				Assets.get_sound(tag="hitbymine").play()
 				self.exploded = True
 
 
@@ -798,15 +813,15 @@ class EnemyShip(SceneObject):
 	
 	def update(self, scene, pressed):
 		
-		#Heath check
-		if self.health <= 0:
-			self.dead = True
-			return
-
-		
 		if not self.dead:
-
-			controls = vec3([0,0,0])
+			#Heath check
+			if self.health <= 0:
+				Assets.get_music("death")
+				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
+				pygame.mixer.music.play(0,0.0)
+				self.dead = True
+				return
+				controls = vec3([0,0,0])
 
 			dx = 0
 			dy = 0
@@ -816,6 +831,9 @@ class EnemyShip(SceneObject):
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
 			if pressed[K_m]:
+				Assets.get_music("minedrop")
+				#pygame.mixer.music.load("Assets/Audio/Effects/MineDrop.wav")
+				pygame.mixer.music.play(0,0.0)
 				scene["mine_collection"].add_mine(self.position, self.velocity)
 
 

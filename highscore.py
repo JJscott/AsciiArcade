@@ -130,7 +130,7 @@ class HighScoreState(object):
 			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
 			ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.1), textorigin = (0.5, 0.5), align = 'c')
 			
-		if ascii_r and self.state=>1:
+		if ascii_r and self.state>=1:
 			#ascii_r.draw_text("Highscorse har plz!", color = (1, 1, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			titleArt = ascii.wordart('HIGHSCORE', 'big')
