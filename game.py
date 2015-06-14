@@ -166,6 +166,7 @@ class PlayGameSubState(GameSubState):
 		self.level = level
 		self.score = score
 		self.soundover = False
+		pygame.mixer.music.stop()
 
 		self.reset()
 
@@ -203,7 +204,7 @@ class PlayGameSubState(GameSubState):
 					self.soundover = True
 				
 				if pressed[K_SPACE] and self.soundover == True:
-					return HighScoreState(self.scene["ship"].score, 0)
+					return HighScoreState(self.scene["ship"].score, 1)
 
 			
 			if ship.win:
