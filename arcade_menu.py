@@ -22,8 +22,9 @@ class ArcadeMenuState(object):
 		self.reset()
 		self.pause = 0
 		#Assets.get_music("music1")
-		pygame.mixer.music.load("Assets/Audio/Music/Music1.wav")
-		pygame.mixer.music.play(-1)
+		if pygame.mixer.music.get_busy() == False:
+			pygame.mixer.music.load("Assets/Audio/Music/Music1.wav")
+			pygame.mixer.music.play(-1)
 
 	def reset(self):
 		self.scene = {}
@@ -43,11 +44,10 @@ class ArcadeMenuState(object):
 		self.pause +=1
 		if self.pause > 50:
 			if pressed[K_SPACE]:
-				pygame.mixer.music.stop()
 				return game.GameState()
 
 			if pressed[K_h]:
-				return highscore.HighScoreState(0)
+				return highscore.HighScoreState(0,0)
 
 
 	# Render logic

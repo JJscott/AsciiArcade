@@ -27,8 +27,8 @@ from collections import defaultdict
 import pygame
 import ascii
 
-
-# 
+from random import randint
+#
 #
 Assets = GL_assets()
 
@@ -165,6 +165,8 @@ class PlayGameSubState(GameSubState):
 		self.show_score = False
 		self.level = level
 		self.score = score
+		self.soundover = False
+		pygame.mixer.music.stop()
 
 		self.reset()
 
@@ -195,15 +197,17 @@ class PlayGameSubState(GameSubState):
 		# Process results of update
 		#
 		ship = self.scene["ship"]
-		if ship.gameover > 60:
+		if ship.gameover > 0 and pygame.mixer.get_busy() == False:
 			if ship.lose:
-				#HACKY HACKY RESET)
-				if pressed[K_SPACE]:
-					return HighScoreState(self.scene["ship"].score, 0)
+				if self.soundover == False:
+					Assets.get_sound(tag="gameover").play()
+					self.soundover = True
+				
+				if pressed[K_SPACE] and self.soundover == True:
+					return HighScoreState(self.scene["ship"].score, 1)
 
 			
 			if ship.win:
-				#HACKY HACKY RESET
 				if pressed[K_SPACE]:
 					if not self.show_score:
 						ship.gameover = 0
@@ -419,7 +423,14 @@ class Bullet(object):
 			Assets.get_sound(tag="hitbybullet").play()
 			enemyship.take_damage(0.5)
 			self.exploded = True
-
+		
+		for m in scene['mine_collection'].mine_list:
+			if m.get_sphere().sphere_intersection(a) <= 0:
+				m.exploded = True
+			# }
+		# }
+	# }
+# }
 
 
 
@@ -598,18 +609,15 @@ class Ship(SceneObject):
 			ship_spheres = self.get_sphere_list()
 			# hacky: we cant die on autopilot
 			if any( ss.sphere_intersection(a) <=0 for ss in ship_spheres for a in scene["asteroid_field"].get_asteroid_collisions(ship_broad_sphere)) and not self.autopilot:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
+				#gameover
 				self.dead = True
 				#return
 
 			#Heath check
 			
 			if self.health <= 0:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
 				self.dead = True
 				#return
 			
@@ -744,12 +752,12 @@ class MineCollection(SceneObject):
 	
 	def update(self, scene, pressed):
 		ship_z = scene["ship"].get_position().z
-		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5 and not b.exploded ]
+		self.mine_list = [b for b in self.mine_list if b.position.z < ship_z + 5]
 		for b in self.mine_list:
 			b.update(scene, pressed)
 			
 
-	def draw(self, gl, proj, view):
+	def draw(self, gl, proj, view, _cache = {}):
 		# Retreive model and shader
 		#
 		vao, vao_size = Assets.get_geometry(tag="mine")
@@ -762,9 +770,23 @@ class MineCollection(SceneObject):
 		gl.glBindVertexArray(vao)
 		gl.glUniformMatrix4fv(gl.glGetUniformLocation(prog, "projectionMatrix"), 1, True, pygloo.c_array(GLfloat, proj.flatten()))
 
+		# explode time instanced vbo
+		vbo_explode_time = _cache.get('vbo_explode_time', None)
+		if not vbo_explode_time:
+			vbo_explode_time = GLuint(0)
+			gl.glGenBuffers(1, vbo_explode_time)
+			_cache['vbo_explode_time'] = vbo_explode_time
+		# }
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_explode_time)
+		gl.glEnableVertexAttribArray(7)
+		gl.glVertexAttribPointer(7, 1, GL_FLOAT, GL_FALSE, 0, 0)
+		gl.glVertexAttribDivisor(7, 1)
+		
 		# Create and buffer the instance data
 		# 
 		mv_array = []
+		et_array = []
 		sphere_mv_array = []
 		model = mat4.scale(0.5,0.5,0.5)
 
@@ -774,7 +796,9 @@ class MineCollection(SceneObject):
 			position = mat4.translate(m.position.x, m.position.y, m.position.z)
 			mv = (view * position * model).transpose()
 			mv_array.extend(mv.flatten())
-
+			
+			et_array.append(m.explode_time)
+			
 			scale = mat4.scale(m.explosion_radius, m.explosion_radius, m.explosion_radius)
 			mv = (view * position * scale).transpose()
 			sphere_mv_array.extend(mv.flatten())
@@ -782,7 +806,10 @@ class MineCollection(SceneObject):
 		mv_c_array = pygloo.c_array(GLfloat, mv_array)
 		gl.glBindBuffer( GL_ARRAY_BUFFER, inst_vbo )
 		gl.glBufferData( GL_ARRAY_BUFFER, sizeof(mv_c_array), mv_c_array, GL_STREAM_DRAW )
-
+		
+		gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_explode_time)
+		gl.glBufferData(GL_ARRAY_BUFFER, len(et_array) * 4, pygloo.c_array(GLfloat, et_array), GL_STREAM_DRAW)
+		
 		# Render Mines
 		# 	
 		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
@@ -804,7 +831,7 @@ class MineCollection(SceneObject):
 		# Render Mine spheres
 		# 	
 		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-		gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
+		#gl.glDrawArraysInstanced(GL_TRIANGLES, 0, vao_size, len(self.mine_list))
 		gl.glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 
@@ -819,10 +846,10 @@ class MineCollection(SceneObject):
 class Mine(object):
 	"""docstring for Mine"""
 
-	dampening = 0.1
+	dampening = 0.01
 	radius = 1.0
 
-	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 5, velocity=vec3([0,0,0])):
+	def __init__(self, position, explosion_radius_growth = 0.1, max_explosion_radius = 2, velocity=vec3([0,0,0])):
 		super(Mine, self).__init__()
 
 		self.position = position
@@ -831,6 +858,7 @@ class Mine(object):
 		self.max_explosion_radius = max_explosion_radius
 		self.explosion_radius = 0.1
 		self.exploded = False
+		self.explode_time = 0.0
 
 	def get_sphere(self):
 		return sphere(self.position, Mine.radius)
@@ -840,20 +868,26 @@ class Mine(object):
 
 		controls = vec3([0,0,0])
 		ship = scene["ship"]
+		
+		if self.exploded:
+			self.explode_time += 0.5
+		# }
+		
+		if not self.exploded:
+			# Increase explosion radius
+			# 
+			self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
 
-		# Increase explosion radius
-		# 
-		self.explosion_radius = min(self.explosion_radius + self.explosion_radius_growth, self.max_explosion_radius)
-
-		# Check if ship is within our lock-on radius
-		# 
-		toShip = ship.position - self.position
-		if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
-			if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) for ss in ship.get_sphere_list()):
-				ship.take_damage(1)
-				Assets.get_sound(tag="hitbymine").play()
-				self.exploded = True
-
+			# Check if ship is within our lock-on radius
+			# 
+			toShip = ship.position - self.position
+			if toShip.mag() < self.explosion_radius + 5: #Arbiotrary scaleing shit, no need to worry
+				if any(sphere(self.position, self.explosion_radius).sphere_intersection(ss) <= 0 for ss in ship.get_sphere_list()):
+					ship.take_damage(1)
+					Assets.get_sound(tag="hitbymine").play()
+					self.exploded = True
+					self.velocity = ship.velocity
+		# }
 
 		# Apply dampening effect
 		# 
@@ -961,9 +995,7 @@ class EnemyShip(SceneObject):
 		if not self.dead:
 			#Heath check
 			if self.health <= 0:
-				Assets.get_music("death")
-				#pygame.mixer.music.load("Assets/Audio/Effects/Death.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound(tag=("explosion"+str(randint(1,5)))).play()
 				self.dead = True
 				return
 				controls = vec3([0,0,0])
@@ -977,9 +1009,7 @@ class EnemyShip(SceneObject):
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
 
 			if pressed[K_m] or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
-				Assets.get_music("minedrop")
-				#pygame.mixer.music.load("Assets/Audio/Effects/MineDrop.wav")
-				pygame.mixer.music.play(0,0.0)
+				Assets.get_sound("minedrop").play()
 				scene["mine_collection"].add_mine(self.position, self.velocity)
 				self.mine_cooldown = self.mine_drop_rate
 
