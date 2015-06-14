@@ -7,7 +7,7 @@ from controller import *
 
 import ascii
 import game
-import highscore
+import highscore, credits
 from vec import *
 import math
 import pygame
@@ -49,7 +49,9 @@ class ArcadeMenuState(object):
 
 			if controller.key_pressed(K_h):
 				return highscore.HighScoreState(0,0)
-
+			
+			if pressed[K_c]:
+				return credits.CreditsState()
 
 	# Render logic
 	#

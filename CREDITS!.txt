@@ -1,14 +1,19 @@
-Josh:
+-- Josh --
+
 Asteroid Baker
 Asteroid Slicer
 Code Master
 His Power Level Will Break Your Scouter
-The Transporter
-The Ideas Guy
+Transporter
+Ideas Guy
 Miner
 Heavy Weapons Guy
-Ben:
+
+
+-- Ben --
+
 ASCII Artist
+Neuron Trainer
 Sensei
 Blazing It x10
 Efficiency King
@@ -16,7 +21,10 @@ Joystick Owner
 Editor
 Demolitionist
 Typewriter
-Ryan:
+
+
+-- Ryan --
+
 Space Shipwright
 Model Monkey
 Asteroid Maker
