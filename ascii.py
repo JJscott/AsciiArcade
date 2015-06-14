@@ -2568,7 +2568,7 @@ class AsciiRenderer:
 		gl.glUniform2i(gl.glGetUniformLocation(prog_dtext, 'viewport_size'), *self._text_size)
 		
 		gl.glBindVertexArray(self._vao_dtext)
-		gl.glDrawArrays(GL_POINTS, 0, len(self._dtext_pos) // 2)
+		gl.glDrawArrays(GL_POINTS, 0, len(self._dtext_pos) // 4)
 		gl.glBindVertexArray(0)
 		
 		# clear text after drawing
