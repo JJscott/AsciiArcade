@@ -8,6 +8,7 @@ Transporter
 Ideas Guy
 Miner
 Heavy Weapons Guy
+Micromanager
 Control Freak
 
 -- Ben --
