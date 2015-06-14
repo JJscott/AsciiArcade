@@ -28,6 +28,7 @@ class GL_assets(object):
 		self.geo_sphere_dict = {}
 		self.shader_dict = {}
 		self.sound_dict = {}
+		self.music_dict = {}
 
 		pygame.mixer.init()
 
@@ -54,9 +55,14 @@ class GL_assets(object):
 		print "Added Shader Asset :: tag={t} prog={p}".format(t=tag, p=prog)
 
 	def load_sound(self, tag, filename):
-		sound = pygame.mixer.sound(filename)
+		sound = pygame.mixer.Sound(filename)
 		self.sound_dict[tag] = sound
 		print "Added Sound Asset :: tag={t} filename={f}".format(t=tag, f=filename)
+		
+		
+	def load_music(self, tag, filename):
+		self.music_dict[tag] = filename
+		print "Added Music Asset :: tag={t} filename={f}".format(t=tag, f=filename)
 
 
 	def get_geometry(self, tag=None):
@@ -80,6 +86,9 @@ class GL_assets(object):
 		if tag: return self.sound_dict[tag]
 		return None
 
+	def get_music(self, tag=None):
+		if tag: pygame.mixer.music.load(self.music_dict[tag])
+		return None
 
 
 

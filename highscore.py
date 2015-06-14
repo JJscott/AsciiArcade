@@ -21,7 +21,7 @@ import re
 
 class HighScoreState(object):
 	"""docstring for HighScoreState"""
-	def __init__(self, score):
+	def __init__(self, score, state):
 		super(HighScoreState, self).__init__()
 		self.pause = 0
 		self.path = 'Highscore.txt'
@@ -41,11 +41,7 @@ class HighScoreState(object):
 		self.selectindex = 0
 		self.selectlocation = 0.4
 		self.score = score
-		if self.score == None:
-			self.state = 1
-		else:
-			self.state = 0
-
+		self.state = state
 
 	# Game logic
 	#
@@ -112,7 +108,7 @@ class HighScoreState(object):
 					line = re.sub('\n','',line)
 					string = re.split('\t', line)
 					self.entries.append(string)
-				self.state = 1
+				self.state = 2
 
 
 	# Render logic
@@ -134,8 +130,7 @@ class HighScoreState(object):
 			scoreArt = ascii.wordart("SCORE: "+str(self.score), 'big')
 			ascii_r.draw_text(scoreArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.1), textorigin = (0.5, 0.5), align = 'c')
 			
-			
-		if ascii_r and self.state==1:
+		if ascii_r and self.state>=1:
 			#ascii_r.draw_text("Highscorse har plz!", color = (1, 1, 1), screenorigin = (0.5, 0.5), textorigin = (0.5, 0.5), align = 'c')
 			
 			titleArt = ascii.wordart('HIGHSCORE', 'big')
@@ -149,5 +144,10 @@ class HighScoreState(object):
 				scoreArt = ascii.wordart(entry[1],'big')
 				ascii_r.draw_text(scoreArt, color = (1, 0.333, 1), screenorigin = (0.75, 0.7-(0.1*count)), textorigin = (0.5, 0.5), align = 'r')
 				count+=1
+			if self.state==1:
+				yourscoreArt = ascii.wordart("YOUR SCORE: ",'big')
+				ascii_r.draw_text(yourscoreArt, color = (1, 0.333, 1), screenorigin = (0.5, 0.05), textorigin = (0.5, 0.5), align = 'c')
+				yourscoreNumArt = ascii.wordart(str(self.score),'big')
+				ascii_r.draw_text(yourscoreNumArt, color = (1, 0.333, 1), screenorigin = (0.75, 0.05), textorigin = (0.5, 0.5), align = 'r')
 			
 

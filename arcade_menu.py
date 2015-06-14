@@ -9,7 +9,11 @@ import game
 import highscore
 from vec import *
 import math
+import pygame
 
+from GL_assets import *
+
+Assets = GL_assets()
 
 class ArcadeMenuState(object):
 	"""docstring for ArcadeMenuState"""
@@ -17,6 +21,9 @@ class ArcadeMenuState(object):
 		super(ArcadeMenuState, self).__init__()
 		self.reset()
 		self.pause = 0
+		#Assets.get_music("music1")
+		pygame.mixer.music.load("Assets/Audio/Music/Music1.wav")
+		pygame.mixer.music.play(-1)
 
 	def reset(self):
 		self.scene = {}
@@ -36,6 +43,7 @@ class ArcadeMenuState(object):
 		self.pause +=1
 		if self.pause > 50:
 			if pressed[K_SPACE]:
+				pygame.mixer.music.stop()
 				return game.GameState()
 
 			if pressed[K_h]:
