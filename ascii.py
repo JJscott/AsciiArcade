@@ -462,7 +462,7 @@ vec3 color() {
 		for (int j = 0; j < char_size.y; j++) {
 			vec3 c = texelFetch(sampler_color, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).rgb;
 			float d = texelFetch(sampler_depth, ivec2(floor(gl_FragCoord.xy)) * char_size + ivec2(i, j), 0).r;
-			best_color = mix(best_color, c, d < min_depth);
+			best_color = mix(best_color, c, bvec3(d < min_depth));
 			min_depth = min(min_depth, d);
 		}
 	}

@@ -69,8 +69,8 @@ mat3 rotationMatrix(vec3 axis, float angle) {
 }
 
 vec3 longest(vec3 a, vec3 b, vec3 c) {
-	vec3 r = mix(a, b, length(b) > length(a));
-	r = mix(r, c, length(c) > length(r));
+	vec3 r = mix(a, b, bvec3(length(b) > length(a)));
+	r = mix(r, c, bvec3(length(c) > length(r)));
 	return r;
 }
 
@@ -94,12 +94,12 @@ void main() {
 	
 	// we may have some backface issues
 	// this negates the face normal to align it to the object normal
-	fn = mix(fn, -fn, dot(fn, on) < 0.0);
+	fn = mix(fn, -fn, bvec3(dot(fn, on) < 0.0));
 	
 	// rotation from face norm towards object norm
 	// being careful of parallel normals
 	bool do_rot = length(fn - on) > 0.05;
-	mat3 rot = rotationMatrix(mix(vec3(1, 0, 0), cross(fn, on), do_rot), acos(dot(fn, on)) * (1.0 - exp(-0.2 * explode_time)));
+	mat3 rot = rotationMatrix(mix(vec3(1, 0, 0), cross(fn, on), bvec3(do_rot)), acos(dot(fn, on)) * (1.0 - exp(-0.2 * explode_time)));
 	
 	for (int i = 0; i < 3; i++) {
 		// exploded vertex position
