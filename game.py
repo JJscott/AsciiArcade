@@ -248,7 +248,7 @@ class PlayGameSubState(GameSubState):
 					elif self.level < 10:
 						return LevelInformationSubState(self.level+1, self.score)
 					else:
-						return HighScoreState(self.score, 0)
+						return HighScoreState(self.score, 0, True)
 		# }
 
 	# Render logic

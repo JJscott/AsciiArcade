@@ -7,12 +7,13 @@ import pygame
 import ascii
 
 from arcade_menu import ArcadeMenuState
+from credits import CreditsState
 
 import re
 
 class HighScoreState(object):
 	"""docstring for HighScoreState"""
-	def __init__(self, score, state):
+	def __init__(self, score, state, show_credits=False):
 		super(HighScoreState, self).__init__()
 		self.pause = 0
 		self.path = 'Highscore.txt'
@@ -35,6 +36,7 @@ class HighScoreState(object):
 		self.state = state
 		self.keyispressed = False
 		self.done = False
+		self.show_credits = show_credits
 		pygame.mixer.music.play(-1)
 
 	# Game logic
@@ -112,7 +114,10 @@ class HighScoreState(object):
 					self.state = 2
 		else:
 			if controller.key_pressed(C_TRIGGER):
-				return ArcadeMenuState()
+				if self.show_credits:
+					return CreditsState()
+				else:
+					return ArcadeMenuState()
 
 
 	# Render logic
