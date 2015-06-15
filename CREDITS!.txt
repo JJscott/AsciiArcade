@@ -10,6 +10,7 @@ Miner
 Heavy Weapons Guy
 Micromanager
 Control Freak
+Man in Black
 
 -- Ben --
 
@@ -23,7 +24,7 @@ Editor
 Demolitionist
 Typewriter
 They See Him Rolling
-
+Score Keeper
 
 -- Ryan --
 
@@ -37,3 +38,7 @@ Sound Mixer
 Audio Conductor
 CRT Trader
 Lore Master
+
+--Chris--
+
+CRT Transporter
