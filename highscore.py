@@ -88,7 +88,7 @@ class HighScoreState(object):
 			self.delay -= 1
 			
 			if controller.key_pressed(C_TRIGGER):
-				if self.selectindex >= 4:
+				if self.done:
 					#correct formatting
 					self.name = str(''.join(self.name))
 					self.entries.append([self.name,self.score])
@@ -124,10 +124,9 @@ class HighScoreState(object):
 	#
 	def render(self, gl, w, h, ascii_r=None):
 		if ascii_r:
+			titleArt = ascii.wordart('HIGHSCORE', 'star_wars')
+			ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
 			if self.state==0:
-				titleArt = ascii.wordart('HIGHSCORE', 'star_wars')
-				ascii_r.draw_text(titleArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.9), textorigin = (0.5, 0.5), align = 'c')
-				
 				if self.pause % 50 < 25 and self.done:
 					selectedArt = ascii.wordart("[SHOOT] to continue", 'big')
 					ascii_r.draw_text(selectedArt, color = (0.333, 1, 1), screenorigin = (0.5, 0.3), textorigin = (0.5, 0.5), align = 'c')
