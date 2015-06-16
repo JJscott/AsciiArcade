@@ -58,8 +58,8 @@ render = render_ascii
 
 
 def run():
-	width = 1278
-	height = 800
+	width = 1280
+	height = 1024
 	tick = 16		#milliseconds
 	
 	# Initilise pyGame and create window
