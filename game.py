@@ -1079,12 +1079,16 @@ class EnemyShip(SceneObject):
 			# if pressed[K_RIGHT] and not pressed[K_LEFT] :	dx =  1.0
 			# if pressed[K_UP] and not pressed[K_DOWN]:		dy = -1.0
 			# if pressed[K_DOWN] and not pressed[K_UP]:		dy =  1.0
-
-			if (controller and controller.key_pressed(K_m)) or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
-				Assets.get_sound("minedrop").play()
-				scene["mine_collection"].add_mine(self.position, self.velocity)
-				self.mine_cooldown = self.mine_drop_rate
-
+			
+			ship = scene.get('ship', None)
+			
+			if ship is not None and not ship.dead:
+				if (controller and controller.key_pressed(K_m)) or (self.mine_cooldown < 0 and self.mine_drop_rate > 0):
+					Assets.get_sound("minedrop").play()
+					scene["mine_collection"].add_mine(self.position, self.velocity)
+					self.mine_cooldown = self.mine_drop_rate
+			# }
+			
 			self.mine_cooldown -= 1
 
 
