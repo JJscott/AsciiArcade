@@ -70,7 +70,7 @@ def run():
 
 	global gl
 	gl = pygloo.init()
-	# gl._begin = True
+	gl._begin = True
 
 	# Load geometry
 	# 
