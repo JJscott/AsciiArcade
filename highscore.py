@@ -153,7 +153,8 @@ class HighScoreState(object):
 				
 			if self.state>=1:
 				count = 0
-				for entry in self.entries:
+				offset = (self.pause / 20) % len(self.entries)
+				for entry in self.entries[offset:]:
 					nameArt = ascii.wordart(entry[0],'big')
 					ascii_r.draw_text(nameArt, color = (1, 0.333, 1), screenorigin = (0.25, 0.7-(0.1*count)), textorigin = (0.5, 0.5), align = 'l')
 					
