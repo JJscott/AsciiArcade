@@ -496,7 +496,7 @@ out VertexData {
 
 void main() {
 	vec2 origin = pos.zw;
-	gl_Position = vec4(((pos.xy + 0.5) / vec2(viewport_size) + origin) * 2.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4(((pos.xy + 0.4) / vec2(viewport_size) + origin) * 2.0 - 1.0, 0.0, 1.0);
 	vertex_out.color = color;
 }
 

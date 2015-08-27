@@ -52,14 +52,14 @@ class HighScoreState(object):
 					if self.selectindex < 4:
 						self.selected += 1
 						self.selected %= self.maxsize
-						self.delay = 10
+						self.delay = 40
 						self.keyispressed = True
 					
 				elif controller.key_down(C_NEG_Y):
 					if self.selectindex < 4:
 						self.selected -= 1
 						self.selected %= self.maxsize
-						self.delay = 10
+						self.delay = 40
 						self.keyispressed = True
 						
 				elif controller.key_down(C_POS_X):
@@ -70,7 +70,7 @@ class HighScoreState(object):
 							self.selectindex += 1
 						elif self.selectindex == 3:
 							self.done = True
-						self.delay = 10
+						self.delay = 40
 						self.keyispressed = True
 					
 				elif controller.key_down(C_NEG_X):
@@ -81,10 +81,11 @@ class HighScoreState(object):
 							self.name[self.selectindex] = self.alphabet[self.selected]
 							self.selected = self.alphabet.index(self.name[self.selectindex-1])
 							self.selectindex -= 1
-						self.delay = 10
+						self.delay = 40
 						self.keyispressed = True
 				else:
 					self.keyispressed = False
+					self.delay = 40
 			self.delay -= 1
 			
 			if controller.key_pressed(C_TRIGGER):

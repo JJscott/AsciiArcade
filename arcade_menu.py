@@ -28,6 +28,7 @@ class ArcadeMenuState(object):
 			pygame.mixer.music.play(-1)
 
 	def reset(self):
+		self.pause = 0
 		self.scene = {}
 		self.scene["ship"] = DummyShip()
 		self.scene["asteroid_field"] = game.AsteroidField()
@@ -52,6 +53,10 @@ class ArcadeMenuState(object):
 			
 			if controller.key_pressed(K_c):
 				return credits.CreditsState()
+
+		# stop asteroids from running out
+		if self.pause > 3600:
+			self.reset()
 
 	# Render logic
 	#
