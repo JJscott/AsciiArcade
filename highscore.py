@@ -113,6 +113,7 @@ class HighScoreState(object):
 						string = re.split('\t', line)
 						self.entries.append(string)
 					self.state = 2
+					self.pause = 0
 		else:
 			if controller.key_pressed(C_TRIGGER):
 				if self.show_credits:
